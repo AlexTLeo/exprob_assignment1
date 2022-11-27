@@ -85,7 +85,8 @@ flow of events, while a component diagram describes the interactions among the
 ROS nodes involved.
 
 ### Finite State Machine
-The robot starts in state **CHARGING** with  a battery level determined by the
+![The Finite State Machine of the robot](media/img/state_machine.png)
+The robot starts in state **CHARGING** with a battery level determined by the
 global variable *STARTING_BATTERY_LEVEL* defined in **robot_state.py**, and
 positioned in location 'E' (which can be changed from the ontology, if desired).<br>
 If the battery is full, the robot will transition to state **PLAN_GOAL** where
