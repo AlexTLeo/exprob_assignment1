@@ -81,7 +81,7 @@ modifying the launch file accordingly.
 ### Finite State Machine
 
 ### Component Diagram
-![Component Diagram of the system](media/img/compdiag_new.png)
+![Component Diagram of the system](media/img/compdiag2.png)
 #### Component: OWL Interface
 #### Component: Robot State
 #### Component: Controller
