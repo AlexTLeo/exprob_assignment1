@@ -39,12 +39,35 @@ roslaunch exprob-assignment1 assignment1.launch
 ```
 
 ## 3. Description
+![Map of the environment](media/img/ontology_map.png)
 The environment is comprised of locations called **rooms** and **corridors**,
 connected to each other by **doors**, and a **robot** that can occupy each of
 these locations one at a time.<br>
 A **room** is an entity that can contain the **robot** and it is characterised
-by having only *one* **door** connecting it to another location.<br>
-A **corridor** is a **room** with *two or more* **doors**
+by having only *one* **door** connecting it to another location.
+A **corridor** is a **room** with *two or more* **doors**.<br>
+Each location is additionally characterised by a numeric data property called
+*visitedAt* that represents the last moment it has been visited by the **robot**,
+expresed in Unix time (since epoch).\n
+Before describing the **robot**'s behaviour, the concepts of *urgency* and
+*reachability* should be introduced: a location is considered *reachable* if it
+is adjacent to the **robot** and *urgent* if it
+has not been visited by the **robot** for a certain amount of seconds, expressed
+by the *urgencyThreshold* property of the **robot**.\n
+The **robot** exhibits the following behaviour: first, it looks for the next
+*reachable* location to visit, following a priority list:
+  1. urgent locations
+  2. corridors
+  3. rooms
+Then, it goes to that location and waits for some time (to simulate work), after
+which a new location is searched for and so on.\n
+During its entire operation, the robot constantly monitors its own battery. If
+the battery level falls below the first threshold (battery *low*), then the robot
+will finsh up its current work and then immediately after go charge itself. If
+however the battery level falls below the second threshold (battery *critical*),
+then the robot will immediately stop its work and find a charging station.\n
+A location is considered a **charger** if it allows the **robot** to charge. In this
+simulation, only the **corridor E** is considered a **charger**.
 
 ### Demo Video
 
@@ -58,6 +81,7 @@ modifying the launch file accordingly.
 ### Finite State Machine
 
 ### Component Diagram
+![Component Diagram of the system](media/img/compdiag.svg)
 #### Component: OWL Interface
 #### Component: Robot State
 #### Component: Controller
