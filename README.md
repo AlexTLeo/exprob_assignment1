@@ -85,13 +85,14 @@ flow of events, while a component diagram describes the interactions among the
 ROS nodes involved.
 
 ### Finite State Machine
-![The Finite State Machine of the robot](media/img/state_diagram.png)<br>
+![The Finite State Machine of the robot](media/img/state_diagram.png)<br><br>
 The robot starts in state **CHARGING** with a battery level determined by the
 global variable *STARTING_BATTERY_LEVEL* defined in **robot_state.py**, and
 positioned in location 'E' (which can be changed from the ontology, if desired).<br>
-If the battery is full, the robot will transition to state **PLAN_GOAL** where
-it will look for the next location to move towards. While planning, the state
-does not change. <br>
+If the battery is low, the robot will immediately charge. If the battery is full,
+the robot will transition to state **PLAN_GOAL** where
+it will look for the next location to move towards.<br>
+
 Once a new goal is planned, the robot transitions to state
 **MOVING** where it will move to change its location. If, while moving, the
 robot detects critically low battery, the state will transition back to **CHARGING**.
@@ -101,6 +102,7 @@ robot to 'E', and the robot will once again attempt to charge.<br>
 If, instead, everything goes well and the robot reaches its final destination,
 then it will transition to state **WAITING** where the robot will simulate
 work by waiting in the new location for a random number of seconds.
+
 If during this wait the battery gets critically low, then the robot will
 immediately attempt to charge. If, instead, everything goes well and the robot
 completes its work, then the transition to state **PLAN_GOAL** will be made and
