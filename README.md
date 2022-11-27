@@ -5,7 +5,7 @@
 
 # Assignment 1
 
-## Introduction
+## 1. Introduction
 This is the first assignment of the "Experimental Robotics Laboratory" course, for the Robotics Engineering degree, University of Genoa.
 
 The goal of this assignment was to simulate, through an ontology, an environment
@@ -15,7 +15,7 @@ on priority mechanisms. A Finite State Machine (FSM) represents the robot state.
 The FSM is implemented through the [ROS SMACH library](http://wiki.ros.org/smach),
 while the ontology is implemented through the [ARMOR framework](https://github.com/EmaroLab/armor).
 
-## Running the program
+## 2. Running the program
 ### Installation
 This simulation runs on ROS Noetic. Clone this repository into your ROS workspace's src/ folder:
 ```
@@ -38,7 +38,7 @@ Launch the simulation:
 roslaunch exprob-assignment1 assignment1.launch
 ```
 
-## Description
+## 3. Description
 The environment is comprised of locations called **rooms** and **corridors**,
 connected to each other by **doors**, and a **robot** that can occupy each of
 these locations one at a time.
@@ -48,7 +48,7 @@ is a **room** with *two or more* **doors**
 
 ### Demo Video
 
-## Behind The Scenes
+## 4. Behind The Scenes
 
 ### Extras
 The **roslaunch** file is set by default to print to the terminal. The program is
@@ -66,6 +66,6 @@ modifying the launch file accordingly.
 
 ### Temporal Diagram
 
-## System Analysis
+## 5. System Analysis
 ### Current Limitations
 ### Possible Improvements
