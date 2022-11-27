@@ -41,10 +41,10 @@ roslaunch exprob-assignment1 assignment1.launch
 ## 3. Description
 The environment is comprised of locations called **rooms** and **corridors**,
 connected to each other by **doors**, and a **robot** that can occupy each of
-these locations one at a time.
+these locations one at a time.<br>
 A **room** is an entity that can contain the **robot** and it is characterised
-by having only *one* **door** connecting it to another location. A **corridor**
-is a **room** with *two or more* **doors**
+by having only *one* **door** connecting it to another location.<br>
+A **corridor** is a **room** with *two or more* **doors**
 
 ### Demo Video
 
