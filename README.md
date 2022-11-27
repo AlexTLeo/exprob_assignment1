@@ -175,9 +175,8 @@ for analysis purposes.
 4. The FSM is non-concurrent, so the robot can only be in one state at any given time.
 5. The robot can freely *teleport* between reachable rooms, as there is no physical model
 to actually control and move.
-### Current Limitations
-1.
-### Future Improvements
+### Current Limitations and Future Improvements
+#### 1. Path Planning Algorithm
 Currently, only adjacent rooms are considered as viable targets. Therefore, no
 path-planning algorithm has been implemented. The only moment in which the robot
 would need one is if the battery becomes *low* and the robot is in room 'R2' or
@@ -186,3 +185,16 @@ In this case, a random goal is chosen, because in the current map this will
 inevitably lead the robot to a corridor which is then adjacent to 'E'.
 However, for bigger maps and more complex movements, a path-planning algorithm
 should be implemented, such as the [A* Search Algorithm](https://en.wikipedia.org/wiki/A*_search_algorithm).
+#### 2. Complex Battery Management
+Currently, the robot is not that robust with regards to its battery management,
+and the battery could run out before the robot has had the time to reach a
+charging station.
+Especially for bigger maps, the thresholds for *low* or *critical* battery levels should
+depend on the robot's distance from charging stations, instead of just being
+some predetermined values. Also, the robot should have some sort of *low power mode*,
+for example when it is idling.
+These improvements would allow for optimal use of the robot's battery.
+#### 3. Actual "Work"
+In this simulation, no real "work" is done by the planner nor the controller.
+Of course, some real task should be given to the robot, and the controller
+expanded to include such task.
