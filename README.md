@@ -39,7 +39,7 @@ roslaunch exprob-assignment1 assignment1.launch
 ```
 
 ## 3. Description
-![Map of the environment](media/img/ontology_map.png)
+![Map of the environment](media/img/ontology_map.png)<br>
 The environment is comprised of locations called **rooms** and **corridors**,
 connected to each other by **doors**, and a **robot** that can occupy each of
 these locations one at a time.<br>
@@ -81,7 +81,7 @@ modifying the launch file accordingly.
 ### Finite State Machine
 
 ### Component Diagram
-![Component Diagram of the system](media/img/compdiag2.png)
+![Component Diagram of the system](media/img/compdiag2.png)<br>
 #### Component: OWL Interface
 #### Component: Robot State
 #### Component: Controller
