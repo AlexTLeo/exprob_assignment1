@@ -65,9 +65,6 @@
         <NamedIndividual IRI="#C2"/>
     </Declaration>
     <Declaration>
-        <NamedIndividual IRI="#Charger1"/>
-    </Declaration>
-    <Declaration>
         <NamedIndividual IRI="#D1"/>
     </Declaration>
     <Declaration>
@@ -310,7 +307,7 @@
     <ObjectPropertyAssertion>
         <ObjectProperty IRI="#isIn"/>
         <NamedIndividual IRI="#Robot1"/>
-        <NamedIndividual IRI="#C1"/>
+        <NamedIndividual IRI="#E"/>
     </ObjectPropertyAssertion>
     <DataPropertyAssertion>
         <DataProperty IRI="#visitedAt"/>

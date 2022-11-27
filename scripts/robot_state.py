@@ -43,6 +43,8 @@ from std_msgs.msg import Empty
 
 LOG_TAG = 'robot_state'
 
+STARTING_BATTERY_LEVEL = 100.0 # battery can go from 0.0 to 100.0
+
 class RobotState:
   """
   This class implements the aforementioned functionalities.
@@ -55,7 +57,7 @@ class RobotState:
     # Initialisation
     rospy.init_node('robot_state', anonymous=True)
     self._pose = None
-    self._battery.battery_level = 50.0 # battery can go from 0.0 to 100.0
+    self._battery.battery_level = STARTING_BATTERY_LEVEL
 
     # Set default parameter values, in case not specified by launch file
     if not rospy.has_param('robot_state/battery_tick'):

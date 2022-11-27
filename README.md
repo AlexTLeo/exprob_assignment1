@@ -80,13 +80,30 @@ simulation, only the **corridor E** is considered a **charger**.
 ### Demo Video
 
 ## 4. Behind The Scenes
-
-### Extras
-The **roslaunch** file is set by default to print to the terminal. The program is
-capable of **logging** and can be set to do so, to the default ROS logs, by
-modifying the launch file accordingly.
+The simulation incorporates several elements: a Finite State Machine governs the
+flow of events, while a component diagram describes the interactions among the
+ROS nodes involved.
 
 ### Finite State Machine
+The robot starts in state **CHARGING** with  a battery level determined by the
+global variable *STARTING_BATTERY_LEVEL* defined in **robot_state.py**, and
+positioned in location 'E' (which can be changed from the ontology, if desired).<br>
+If the battery is full, the robot will transition to state **PLAN_GOAL** where
+it will look for the next location to move towards. While planning, the state
+does not change. <br>
+Once a new goal is planned, the robot transitions to state
+**MOVING** where it will move to change its location. If, while moving, the
+robot detects critically low battery, the state will transition back to **CHARGING**.
+However, since charging can only happen in location 'E', if the robot is not
+in the right place, then a new plan will immediately be created to bring the
+robot to 'E', and the robot will once again attempt to charge.<br>
+If, instead, everything goes well and the robot reaches its final destination,
+then it will transition to state **WAITING** where the robot will simulate
+work by waiting in the new location for a random number of seconds.
+If during this wait the battery gets critically low, then the robot will
+immediately attempt to charge. If, instead, everything goes well and the robot
+completes its work, then the transition to state **PLAN_GOAL** will be made and
+the robot will look for a new goal.
 
 ### Component Diagram
 ![Component Diagram of the system](media/img/compdiag2.png)<br>
@@ -98,6 +115,15 @@ modifying the launch file accordingly.
 
 ### Temporal Diagram
 
+### Extras
+The **roslaunch** file is set by default to print to the terminal. The program is
+capable of **logging** and can be set to do so, to the default ROS logs, by
+modifying the launch file accordingly.
+
 ## 5. System Analysis
+### Assumptions
+1. The robot starts in state CHARGING and in room 'E', even though these can be
+tweaked from the ontology and from the behaviour.py script.
 ### Current Limitations
 ### Possible Improvements
+graph search
