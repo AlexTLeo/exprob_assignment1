@@ -58,6 +58,7 @@ Before describing the **robot**'s behaviour, the concepts of *urgency* and
 - a location is considered *urgent* if it has not been visited by the **robot**
 for a certain amount of seconds, expressed by the *urgencyThreshold* property of
 the **robot**.\n
+
 The **robot** exhibits the following behaviour: first, it looks for the next
 *reachable* location to visit, following a priority list:
   1. urgent locations
