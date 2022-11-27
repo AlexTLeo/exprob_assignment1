@@ -66,12 +66,14 @@ The **robot** exhibits the following behaviour: first, it looks for the next
   3. rooms
 
 Then, it goes to that location and waits for some time (to simulate work), after
-which a new location is searched for and so on.<br>
+which a new location is searched for and so on.
+
 During its entire operation, the robot constantly monitors its own battery. If
 the battery level falls below the first threshold (battery *low*), then the robot
 will finsh up its current work and then immediately after go charge itself. If
 however the battery level falls below the second threshold (battery *critical*),
-then the robot will immediately stop its work and find a charging station.<br>
+then the robot will immediately stop its work and find a charging station.
+
 A location is considered a **charger** if it allows the **robot** to charge. In this
 simulation, only the **corridor E** is considered a **charger**.
 
