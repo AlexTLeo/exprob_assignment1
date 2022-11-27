@@ -43,12 +43,14 @@ roslaunch exprob-assignment1 assignment1.launch
 The environment is comprised of locations called **rooms** and **corridors**,
 connected to each other by **doors**, and a **robot** that can occupy each of
 these locations one at a time.<br>
+
 A **room** is an entity that can contain the **robot** and it is characterised
-by having only *one* **door** connecting it to another location.
+by having only *one* **door** connecting it to another location.<br>
 A **corridor** is a **room** with *two or more* **doors**.<br>
 Each location is additionally characterised by a numeric data property called
 *visitedAt* that represents the last moment it has been visited by the **robot**,
 expresed in Unix time (since epoch).\n
+
 Before describing the **robot**'s behaviour, the concepts of *urgency* and
 *reachability* should be introduced: a location is considered *reachable* if it
 is adjacent to the **robot** and *urgent* if it
@@ -59,6 +61,7 @@ The **robot** exhibits the following behaviour: first, it looks for the next
   1. urgent locations
   2. corridors
   3. rooms
+
 Then, it goes to that location and waits for some time (to simulate work), after
 which a new location is searched for and so on.\n
 During its entire operation, the robot constantly monitors its own battery. If
