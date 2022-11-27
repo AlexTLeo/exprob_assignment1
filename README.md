@@ -39,7 +39,7 @@ roslaunch exprob-assignment1 assignment1.launch
 ```
 
 ## 3. Description
-<img alt="Map of the environment" src="media/img/ontology_map.png" height="200"><br>
+<img alt="Map of the environment" src="media/img/ontology_map.png" height="400"><br>
 The environment is comprised of locations called **rooms** and **corridors**,
 connected to each other by **doors**, and a **robot** that can occupy each of
 these locations one at a time.<br>
