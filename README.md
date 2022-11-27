@@ -53,10 +53,11 @@ Each location is additionally characterised by a numeric data property called
 expresed in Unix time (since epoch).\n
 
 Before describing the **robot**'s behaviour, the concepts of *urgency* and
-*reachability* should be introduced: a location is considered *reachable* if it
-is adjacent to the **robot** and *urgent* if it
-has not been visited by the **robot** for a certain amount of seconds, expressed
-by the *urgencyThreshold* property of the **robot**.\n
+*reachability* should be introduced:
+- a location is considered *reachable* if it is adjacent to the **robot**.
+- a location is considered *urgent* if it has not been visited by the **robot**
+for a certain amount of seconds, expressed by the *urgencyThreshold* property of
+the **robot**.\n
 The **robot** exhibits the following behaviour: first, it looks for the next
 *reachable* location to visit, following a priority list:
   1. urgent locations
