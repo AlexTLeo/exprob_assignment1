@@ -1,0 +1,4 @@
+### The service for battery mode: 'charging', 'discharging'
+string battery_mode
+---
+std_msgs/Empty empty

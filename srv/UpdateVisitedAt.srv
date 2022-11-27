@@ -1,0 +1,4 @@
+### The service for updating visited at time
+Location location # location to update
+---
+std_msgs/Empty empty

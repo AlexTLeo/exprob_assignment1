@@ -1,0 +1,18 @@
+###### The controller charger interface
+
+### Action Server Goal
+
+# When this is received, the server will attempt charging
+std_msgs/Empty empty
+
+---
+
+### Action Server Result
+
+std_msgs/Empty empty
+
+---
+
+### Action Server Feedback
+
+std_msgs/Empty empty

@@ -1,0 +1,20 @@
+###### The motion controller interface
+
+### Action Server Goal
+
+# The via_points to be followed.
+Location[] via_points
+
+---
+
+### Action Server Result
+
+# Final goal reached or not
+std_msgs/Bool success
+
+---
+
+### Action Server Feedback
+
+# All locations reached up until the moment of request
+Location[] via_points_reached

@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>scripts.owl_interface &mdash; exp-assignment1  documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/graphviz.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../index.html" class="icon icon-home"> exp-assignment1
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">exp-assignment1</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+      <li>scripts.owl_interface</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for scripts.owl_interface</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">.. module::owl_interface</span>
+<span class="sd">   :platform: Ubuntu 20.04</span>
+<span class="sd">   :snyopsis: This module interfaces with the ontology, i.e. an OWL representation of</span>
+<span class="sd">   the current situation.</span>
+
+<span class="sd">.. moduleauthor::Alex Thanaphon Leonardi &lt;thanaphon.leonardi@gmail.com&gt;</span>
+
+<span class="sd">This module interfaces with the OWL ontology representing both the map and the</span>
+<span class="sd">current situation (robot battery, timestamps, etc.). It exposes multiple publishers,</span>
+<span class="sd">subscribers and services to allow other nodes to interact with the ontology</span>
+<span class="sd">whilst hiding the implementation details.</span>
+
+<span class="sd">The `armor_py_api library &lt;https://github.com/EmaroLab/armor_py_api&gt;`_ is used</span>
+<span class="sd">to facilitate operations.</span>
+
+<span class="sd">ROS Parameters:</span>
+<span class="sd">  **/owl_interface/map_file_name** the name of the .owl file containing the ontology.\n</span>
+<span class="sd">  **/battery/threshold_low** the threshold below which the battery should be considered as &#39;low&#39;.</span>
+
+<span class="sd">Publishes to:</span>
+<span class="sd">  **/owl_interface/get_pose** the current robot location.\n</span>
+<span class="sd">  **/owl_interface/goal** the current goal.</span>
+
+<span class="sd">Subscribes to:</span>
+<span class="sd">  **/owl_interface/set_pose** receive a new pose to set.\n</span>
+<span class="sd">  **/state/battery_level** receive the robot&#39;s current battery level.</span>
+
+<span class="sd">Service:</span>
+<span class="sd">  **/owl_interface/get_goal** immediately queries the ontology for the next goal.\n</span>
+<span class="sd">  **/owl_interface/get_pose** immediately queries the ontology for the current pose.\n</span>
+<span class="sd">  **/owl_interface/update_visited** immediately updates the passed location&#39;s</span>
+<span class="sd">  &quot;visitedAt&quot; timestamp in the ontology.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">rospy</span>
+<span class="kn">import</span> <span class="nn">threading</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">from</span> <span class="nn">assignment1</span> <span class="kn">import</span> <span class="n">utils</span>
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="kn">import</span> <span class="n">dirname</span><span class="p">,</span> <span class="n">realpath</span>
+<span class="kn">from</span> <span class="nn">armor_api.armor_client</span> <span class="kn">import</span> <span class="n">ArmorClient</span>
+<span class="kn">from</span> <span class="nn">assignment1.msg</span> <span class="kn">import</span> <span class="n">Location</span><span class="p">,</span> <span class="n">Battery</span>
+<span class="kn">from</span> <span class="nn">assignment1.srv</span> <span class="kn">import</span> <span class="n">UpdateVisitedAt</span><span class="p">,</span> <span class="n">GetGoal</span><span class="p">,</span> <span class="n">GetPose</span>
+<span class="kn">from</span> <span class="nn">std_msgs.msg</span> <span class="kn">import</span> <span class="n">Empty</span>
+
+<span class="n">LOG_TAG</span> <span class="o">=</span> <span class="s1">&#39;owl_interface&#39;</span>
+<span class="n">RATE_SEARCH</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="c1"># Hz</span>
+<span class="n">RATE_GOAL</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="c1"># Hz</span>
+<span class="n">RATE_GET_POSE</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="c1"># Hz</span>
+<span class="n">RATE_CHECK_BATTERY</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="c1"># Hz</span>
+
+<div class="viewcode-block" id="OwlInterface"><a class="viewcode-back" href="../../index.html#scripts.owl_interface.OwlInterface">[docs]</a><span class="k">class</span> <span class="nc">OwlInterface</span><span class="p">:</span>
+  <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">  This class implements the aforementioned functionalities.</span>
+<span class="sd">  &quot;&quot;&quot;</span>
+  <span class="c1"># Defining class attributes</span>
+  <span class="n">_current_goal</span> <span class="o">=</span> <span class="n">Location</span><span class="p">()</span>
+
+  <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">robot_name</span><span class="p">):</span>
+    <span class="c1"># Initialisation</span>
+    <span class="n">rospy</span><span class="o">.</span><span class="n">init_node</span><span class="p">(</span><span class="s1">&#39;owl_interface&#39;</span><span class="p">,</span> <span class="n">anonymous</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># Log</span>
+    <span class="n">log_msg</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;Initialised node: owl_interface&#39;</span><span class="p">)</span>
+    <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="n">log_msg</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+
+    <span class="bp">self</span><span class="o">.</span><span class="n">robot_name</span> <span class="o">=</span> <span class="n">robot_name</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_current_goal</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_is_battery_low</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="c1"># Set default parameter values, in case not specified by launch file</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">rospy</span><span class="o">.</span><span class="n">has_param</span><span class="p">(</span><span class="s1">&#39;owl_interface/map_file_name&#39;</span><span class="p">):</span>
+      <span class="n">rospy</span><span class="o">.</span><span class="n">set_param</span><span class="p">(</span><span class="s1">&#39;owl_interface/map_file_name&#39;</span><span class="p">,</span> <span class="s1">&#39;assignment1_map.owl&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">rospy</span><span class="o">.</span><span class="n">has_param</span><span class="p">(</span><span class="s1">&#39;battery/threshold_low&#39;</span><span class="p">):</span>
+      <span class="n">rospy</span><span class="o">.</span><span class="n">set_param</span><span class="p">(</span><span class="s1">&#39;battery/threshold_low&#39;</span><span class="p">,</span> <span class="mi">40</span><span class="p">)</span>
+
+    <span class="c1"># Maps should be contained within the &quot;maps&quot; folder</span>
+    <span class="n">map_dir</span> <span class="o">=</span> <span class="n">dirname</span><span class="p">(</span><span class="n">realpath</span><span class="p">(</span><span class="vm">__file__</span><span class="p">))</span> <span class="o">+</span> <span class="s2">&quot;/../maps/&quot;</span>
+    <span class="n">map_name</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">get_param</span><span class="p">(</span><span class="s1">&#39;owl_interface/map_file_name&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Start the armor client</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_armor_client</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_init_armor_client</span><span class="p">(</span><span class="n">map_dir</span><span class="p">,</span> <span class="n">map_name</span><span class="p">,</span>
+        <span class="s1">&#39;assignment1_armor_client&#39;</span><span class="p">,</span> <span class="s1">&#39;assignment1_armor_reference&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Subscribe to /state/battery_level and get the battery level</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">sub_get_battery</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Subscriber</span><span class="p">(</span><span class="s1">&#39;/state/battery_level&#39;</span><span class="p">,</span> <span class="n">Battery</span><span class="p">,</span>
+                                          <span class="bp">self</span><span class="o">.</span><span class="n">_subscribe_get_battery</span><span class="p">,</span> <span class="n">queue_size</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span>
+
+    <span class="c1"># Service to get the next goal</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_srv_get_goal</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Service</span><span class="p">(</span><span class="s1">&#39;/owl_interface/get_goal&#39;</span><span class="p">,</span>
+                              <span class="n">GetGoal</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_service_get_goal</span><span class="p">)</span>
+
+    <span class="c1"># Service to get the current pose</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_srv_get_pose</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Service</span><span class="p">(</span><span class="s1">&#39;/owl_interface/get_pose&#39;</span><span class="p">,</span>
+                              <span class="n">GetPose</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_service_get_pose</span><span class="p">)</span>
+
+    <span class="c1"># This function regularly updates the robot&#39;s internal clock</span>
+    <span class="n">thread_update_robot_time</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Thread</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_update_robot_time</span><span class="p">)</span>
+    <span class="n">thread_update_robot_time</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+
+    <span class="c1"># Publish the next goal</span>
+    <span class="n">thread_get_goal</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Thread</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_search_next_goal</span><span class="p">)</span>
+    <span class="n">thread_get_goal</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+
+    <span class="c1"># Give some time to find the first goal...</span>
+    <span class="n">rospy</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="c1"># Publish the current pose</span>
+    <span class="n">thread_pub_pose</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Thread</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_publish_pose</span><span class="p">)</span>
+    <span class="n">thread_pub_pose</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+
+    <span class="c1"># Subscribe to /owl_interface/set_pose requests and set a new pose in the ontology</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_sub_set_pose</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Subscriber</span><span class="p">(</span><span class="s1">&#39;/owl_interface/set_pose&#39;</span><span class="p">,</span> <span class="n">Location</span><span class="p">,</span>
+                                          <span class="bp">self</span><span class="o">.</span><span class="n">_subscribe_set_pose_callback</span><span class="p">,</span>
+                                          <span class="n">queue_size</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="c1"># Publish the goal</span>
+    <span class="n">thread_pub_goal</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Thread</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_publish_goal</span><span class="p">)</span>
+    <span class="n">thread_pub_goal</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+
+    <span class="c1"># Service to update the visitedAt data property</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_srv_update_visited</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Service</span><span class="p">(</span><span class="s1">&#39;/owl_interface/update_visited&#39;</span><span class="p">,</span>
+                              <span class="n">UpdateVisitedAt</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_update_visited</span><span class="p">)</span>
+
+    <span class="c1"># Log</span>
+    <span class="n">log_msg</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;Node setup complete&#39;</span><span class="p">)</span>
+    <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="n">log_msg</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+
+    <span class="n">rospy</span><span class="o">.</span><span class="n">spin</span><span class="p">()</span>
+
+<div class="viewcode-block" id="OwlInterface._init_armor_client"><a class="viewcode-back" href="../../index.html#scripts.owl_interface.OwlInterface._init_armor_client">[docs]</a>  <span class="k">def</span> <span class="nf">_init_armor_client</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">map_dir</span><span class="p">,</span> <span class="n">file_name</span><span class="p">,</span> <span class="n">client_id</span><span class="p">,</span> <span class="n">ref_name</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Initialises the armor client and reads the .owl file containing the</span>
+<span class="sd">    environment map and its current situation.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">      map_dir (str): The directory containing all the maps.</span>
+<span class="sd">      file_name (str): The name of the map to load.</span>
+<span class="sd">      ref_name (str): The name of the armor reference.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">      armor_client (ArmorClient): A handler for the armor client.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">armor_client</span> <span class="o">=</span> <span class="n">ArmorClient</span><span class="p">(</span><span class="n">client_id</span><span class="p">,</span> <span class="n">ref_name</span><span class="p">)</span>
+    <span class="n">armor_client</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">load_ref_from_file</span><span class="p">(</span><span class="n">map_dir</span> <span class="o">+</span> <span class="n">file_name</span><span class="p">,</span>
+                    <span class="s1">&#39;http://bnc/exp-rob-lab/2022-23&#39;</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="s2">&quot;PELLET&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+    <span class="n">armor_client</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">mount_on_ref</span><span class="p">()</span>
+    <span class="n">armor_client</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">set_log_to_terminal</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="s1">&#39;Initialised armor client&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="n">armor_client</span></div>
+
+<div class="viewcode-block" id="OwlInterface._update_robot_time"><a class="viewcode-back" href="../../index.html#scripts.owl_interface.OwlInterface._update_robot_time">[docs]</a>  <span class="k">def</span> <span class="nf">_update_robot_time</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Updates the robot&#39;s internal clock in the ontology once every second.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">armor_client</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_armor_client</span>
+    <span class="n">rate</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Rate</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">while</span> <span class="ow">not</span> <span class="n">rospy</span><span class="o">.</span><span class="n">is_shutdown</span><span class="p">():</span>
+      <span class="c1"># Get current time and old time</span>
+      <span class="n">new_time</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()))</span>
+      <span class="n">old_time</span> <span class="o">=</span> <span class="n">armor_client</span><span class="o">.</span><span class="n">query</span><span class="o">.</span><span class="n">dataprop_b2_ind</span><span class="p">(</span><span class="s1">&#39;now&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">robot_name</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+      <span class="c1"># Trim the value because the ontology returns extra details</span>
+      <span class="n">old_time</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;&quot;(.+?)&quot;&#39;</span><span class="p">,</span> <span class="n">old_time</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+
+      <span class="c1"># Update the time</span>
+      <span class="n">armor_client</span><span class="o">.</span><span class="n">manipulation</span><span class="o">.</span><span class="n">remove_dataprop_from_ind</span><span class="p">(</span><span class="s1">&#39;now&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">robot_name</span><span class="p">,</span> <span class="s1">&#39;LONG&#39;</span><span class="p">,</span> <span class="n">old_time</span><span class="p">)</span>
+      <span class="n">armor_client</span><span class="o">.</span><span class="n">manipulation</span><span class="o">.</span><span class="n">add_dataprop_to_ind</span><span class="p">(</span><span class="s1">&#39;now&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">robot_name</span><span class="p">,</span> <span class="s1">&#39;LONG&#39;</span><span class="p">,</span> <span class="n">new_time</span><span class="p">)</span>
+      <span class="n">armor_client</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">sync_buffered_reasoner</span><span class="p">()</span>
+      <span class="n">armor_client</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">apply_buffered_changes</span><span class="p">()</span>
+
+      <span class="n">rate</span><span class="o">.</span><span class="n">sleep</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="OwlInterface._subscribe_get_battery"><a class="viewcode-back" href="../../index.html#scripts.owl_interface.OwlInterface._subscribe_get_battery">[docs]</a>  <span class="k">def</span> <span class="nf">_subscribe_get_battery</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Subscribes to /state/battery_level and gets the current battery level. If it gets</span>
+<span class="sd">    too low (specified by the /battery/threshold_low parameter), then this node</span>
+<span class="sd">    will start prioritising locations equipped with a charging station as goal points.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">      data (Battery): the current battery level</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">battery_msg</span> <span class="o">=</span> <span class="n">Battery</span><span class="p">()</span>
+    <span class="n">battery_msg</span> <span class="o">=</span> <span class="n">data</span>
+    <span class="n">battery_level</span> <span class="o">=</span> <span class="n">battery_msg</span><span class="o">.</span><span class="n">battery_level</span>
+    <span class="n">battery_threshold_low</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">get_param</span><span class="p">(</span><span class="s1">&#39;battery/threshold_low&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Check battery status</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">battery_level</span> <span class="o">&lt;=</span> <span class="n">battery_threshold_low</span><span class="p">):</span>
+      <span class="c1"># LOW_BATTERY: recharge as soon as it is convenient</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">_is_battery_low</span> <span class="o">=</span> <span class="kc">True</span>
+      <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="s1">&#39;LOW battery level detected, searching for charging station...&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+      <span class="c1"># CHARGED: operate normally</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">_is_battery_low</span> <span class="o">=</span> <span class="kc">False</span></div>
+
+<div class="viewcode-block" id="OwlInterface._service_get_goal"><a class="viewcode-back" href="../../index.html#scripts.owl_interface.OwlInterface._service_get_goal">[docs]</a>  <span class="k">def</span> <span class="nf">_service_get_goal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">req</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Queries the ontology to get the next goal by calling the /owl_interface/get_goal</span>
+<span class="sd">    service and returns it to the service caller.</span>
+
+<span class="sd">    The rule for finding the next goal is the following: only adjacent locations</span>
+<span class="sd">    are considered &#39;reachable&#39;. Among these, the most urgent ones are the ones</span>
+<span class="sd">    that were visited a long time ago. If no urgent location is found, a random</span>
+<span class="sd">    one is selected. If the battery is low, only rooms with a charging station</span>
+<span class="sd">    will be selected as acceptable goals.</span>
+
+<span class="sd">    This should be used when precise synchronization is required, as the equivalent</span>
+<span class="sd">    publisher might be slightly slower.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">      req (Empty): This is ignored.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">goal</span> <span class="o">=</span> <span class="n">Location</span><span class="p">()</span>
+    <span class="n">armor_client</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_armor_client</span>
+    <span class="c1"># Find reachable locations</span>
+    <span class="n">locations_reachable</span> <span class="o">=</span> <span class="n">armor_client</span><span class="o">.</span><span class="n">query</span><span class="o">.</span><span class="n">objectprop_b2_ind</span><span class="p">(</span><span class="s1">&#39;canReach&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">robot_name</span><span class="p">)</span>
+
+    <span class="c1"># If battery level is low, prioritise charging station, otherwise operate</span>
+    <span class="c1"># normally</span>
+    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_battery_low</span> <span class="o">==</span> <span class="kc">False</span><span class="p">:</span>
+      <span class="c1"># Get all urgent locations</span>
+      <span class="n">locations_urgent</span> <span class="o">=</span> <span class="n">armor_client</span><span class="o">.</span><span class="n">query</span><span class="o">.</span><span class="n">ind_b2_class</span><span class="p">(</span><span class="s1">&#39;URGENT&#39;</span><span class="p">)</span>
+      <span class="c1"># Check for reachable urgent locations, if any</span>
+      <span class="n">locations_urgent_reachable</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">locations_reachable</span><span class="p">)</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="n">locations_urgent</span><span class="p">))</span>
+
+      <span class="c1"># If there are no urgent locations, pick a random reachable location</span>
+      <span class="k">if</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">locations_urgent_reachable</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">):</span>
+        <span class="n">goal</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">locations_reachable</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Picking reachable location: </span><span class="si">{</span><span class="n">goal</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+      <span class="k">else</span><span class="p">:</span>
+        <span class="n">goal</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">locations_urgent_reachable</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Picking urgent location: </span><span class="si">{</span><span class="n">goal</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+      <span class="c1"># If exists, get closest charging station, otherwise get a random location</span>
+      <span class="c1"># and try again next search.</span>
+      <span class="c1"># In this simulation, we know that E is a charging station.</span>
+      <span class="n">location_charger</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;E&#39;</span><span class="p">]</span>
+
+      <span class="c1"># First of all, check if already in &#39;E&#39;</span>
+      <span class="n">location_current</span> <span class="o">=</span> <span class="n">armor_client</span><span class="o">.</span><span class="n">query</span><span class="o">.</span><span class="n">objectprop_b2_ind</span><span class="p">(</span><span class="s1">&#39;isIn&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">robot_name</span><span class="p">)</span>
+
+      <span class="k">if</span> <span class="p">(</span><span class="n">location_current</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">location_charger</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+        <span class="c1"># We are already here! Just send the same goal again.</span>
+        <span class="n">goal</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">location_current</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Already at charging station. Sending same location: </span><span class="si">{</span><span class="n">goal</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+
+      <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># If not there already, then check if E is among the reachable locations.</span>
+        <span class="n">locations_reachable_charger</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">locations_reachable</span><span class="p">)</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="n">location_charger</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">locations_reachable_charger</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">):</span>
+          <span class="c1"># If no charger locations reachable, pick a random reachable location</span>
+          <span class="n">goal</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">locations_reachable</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+          <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Charging station not reachable. Picking reachable location: </span><span class="si">{</span><span class="n">goal</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+          <span class="c1"># Charger found</span>
+          <span class="n">goal</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">locations_reachable_charger</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+          <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Picking reachable charging station: </span><span class="si">{</span><span class="n">goal</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="n">goal</span></div>
+
+<div class="viewcode-block" id="OwlInterface._search_next_goal"><a class="viewcode-back" href="../../index.html#scripts.owl_interface.OwlInterface._search_next_goal">[docs]</a>  <span class="k">def</span> <span class="nf">_search_next_goal</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Looks for the next goal and saves it internally. It will be published by the</span>
+<span class="sd">    /owl_interface/goal publisher.</span>
+
+<span class="sd">    The rule for finding the next goal is the following: only adjacent locations</span>
+<span class="sd">    are considered &#39;reachable&#39;. Among these, the most urgent ones are the ones</span>
+<span class="sd">    that were visited a long time ago. If no urgent location is found, a random</span>
+<span class="sd">    one is selected. If the battery is low, only rooms with a charging station</span>
+<span class="sd">    will be selected as acceptable goals.</span>
+
+<span class="sd">    If it is strictly necessary to receive the latest goal, then use the service</span>
+<span class="sd">    /owl_interface/get_goal instead.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">rate</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Rate</span><span class="p">(</span><span class="n">RATE_SEARCH</span><span class="p">)</span>
+    <span class="n">goal</span> <span class="o">=</span> <span class="n">Location</span><span class="p">()</span>
+
+    <span class="k">while</span> <span class="ow">not</span> <span class="n">rospy</span><span class="o">.</span><span class="n">is_shutdown</span><span class="p">():</span>
+      <span class="n">armor_client</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_armor_client</span>
+      <span class="c1"># Find reachable locations</span>
+      <span class="n">locations_reachable</span> <span class="o">=</span> <span class="n">armor_client</span><span class="o">.</span><span class="n">query</span><span class="o">.</span><span class="n">objectprop_b2_ind</span><span class="p">(</span><span class="s1">&#39;canReach&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">robot_name</span><span class="p">)</span>
+
+      <span class="c1"># If battery level is low, prioritise charging station, otherwise operate</span>
+      <span class="c1"># normally</span>
+      <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_battery_low</span> <span class="o">==</span> <span class="kc">False</span><span class="p">:</span>
+        <span class="c1"># Get all urgent locations</span>
+        <span class="n">locations_urgent</span> <span class="o">=</span> <span class="n">armor_client</span><span class="o">.</span><span class="n">query</span><span class="o">.</span><span class="n">ind_b2_class</span><span class="p">(</span><span class="s1">&#39;URGENT&#39;</span><span class="p">)</span>
+        <span class="c1"># Check for reachable urgent locations, if any</span>
+        <span class="n">locations_urgent_reachable</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">locations_reachable</span><span class="p">)</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="n">locations_urgent</span><span class="p">))</span>
+
+        <span class="c1"># If there are no urgent locations, pick a random reachable location</span>
+        <span class="k">if</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">locations_urgent_reachable</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">):</span>
+          <span class="n">goal</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">locations_reachable</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+          <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Picking reachable location: </span><span class="si">{</span><span class="n">goal</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+          <span class="n">goal</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">locations_urgent_reachable</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+          <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Picking urgent location: </span><span class="si">{</span><span class="n">goal</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+      <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># If exists, get closest charging station, otherwise get a random location</span>
+        <span class="c1"># and try again next search.</span>
+        <span class="c1"># In this simulation, we know that E is a charging station.</span>
+        <span class="n">location_charger</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;E&#39;</span><span class="p">]</span>
+
+        <span class="c1"># First of all, check if already in &#39;E&#39;</span>
+        <span class="n">location_current</span> <span class="o">=</span> <span class="n">armor_client</span><span class="o">.</span><span class="n">query</span><span class="o">.</span><span class="n">objectprop_b2_ind</span><span class="p">(</span><span class="s1">&#39;isIn&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">robot_name</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="n">location_current</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">location_charger</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+          <span class="c1"># We are already here! Just send the same goal again.</span>
+          <span class="n">goal</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">location_current</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+          <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Already at charging station. Sending same location: </span><span class="si">{</span><span class="n">goal</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+
+        <span class="k">else</span><span class="p">:</span>
+          <span class="c1"># If not there already, then check if E is among the reachable locations.</span>
+          <span class="n">locations_reachable_charger</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">locations_reachable</span><span class="p">)</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="n">location_charger</span><span class="p">))</span>
+
+          <span class="k">if</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">locations_reachable_charger</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">):</span>
+            <span class="c1"># If no charger locations reachable, pick a random reachable location</span>
+            <span class="n">goal</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">locations_reachable</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Charging station not reachable. Picking reachable location: </span><span class="si">{</span><span class="n">goal</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+          <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Charger found</span>
+            <span class="n">goal</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">locations_reachable_charger</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Picking reachable charging station: </span><span class="si">{</span><span class="n">goal</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+
+      <span class="bp">self</span><span class="o">.</span><span class="n">_current_goal</span> <span class="o">=</span> <span class="n">goal</span>
+
+      <span class="n">rate</span><span class="o">.</span><span class="n">sleep</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="OwlInterface._publish_pose"><a class="viewcode-back" href="../../index.html#scripts.owl_interface.OwlInterface._publish_pose">[docs]</a>  <span class="k">def</span> <span class="nf">_publish_pose</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Publishes the current pose to the /owl_interface/get_pose topic at a rate</span>
+<span class="sd">    defined by the RATE_GET_POSE global variable.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">pub_pose</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Publisher</span><span class="p">(</span><span class="s1">&#39;/owl_interface/get_pose&#39;</span><span class="p">,</span> <span class="n">Location</span><span class="p">,</span> <span class="n">queue_size</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> <span class="n">latch</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span>
+    <span class="n">rate</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Rate</span><span class="p">(</span><span class="n">RATE_GET_POSE</span><span class="p">)</span>
+    <span class="n">current_location</span> <span class="o">=</span> <span class="n">Location</span><span class="p">()</span>
+
+    <span class="k">while</span> <span class="ow">not</span> <span class="n">rospy</span><span class="o">.</span><span class="n">is_shutdown</span><span class="p">():</span>
+      <span class="n">armor_client</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_armor_client</span>
+      <span class="c1"># Get current robot location</span>
+      <span class="n">current_location</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">armor_client</span><span class="o">.</span><span class="n">query</span><span class="o">.</span><span class="n">objectprop_b2_ind</span><span class="p">(</span><span class="s1">&#39;isIn&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">robot_name</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+
+      <span class="n">pub_pose</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">current_location</span><span class="p">)</span>
+
+      <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Published current pose: </span><span class="si">{</span><span class="n">current_location</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+
+      <span class="n">rate</span><span class="o">.</span><span class="n">sleep</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="OwlInterface._service_get_pose"><a class="viewcode-back" href="../../index.html#scripts.owl_interface.OwlInterface._service_get_pose">[docs]</a>  <span class="k">def</span> <span class="nf">_service_get_pose</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">req</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Queries the ontology to get the current pose by calling the /owl_interface/get_pose</span>
+<span class="sd">    service and returns it to the service caller.</span>
+
+<span class="sd">    This should be used when precise synchronization is required, as the equivalent</span>
+<span class="sd">    publisher might be slightly slower.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">      req (Empty): This is ignored.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">armor_client</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_armor_client</span>
+
+    <span class="c1"># Get current robot location</span>
+    <span class="n">current_location</span> <span class="o">=</span> <span class="n">Location</span><span class="p">()</span>
+    <span class="n">current_location</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">armor_client</span><span class="o">.</span><span class="n">query</span><span class="o">.</span><span class="n">objectprop_b2_ind</span><span class="p">(</span><span class="s1">&#39;isIn&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">robot_name</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Published current pose: </span><span class="si">{</span><span class="n">current_location</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="n">current_location</span></div>
+
+<div class="viewcode-block" id="OwlInterface._subscribe_set_pose_callback"><a class="viewcode-back" href="../../index.html#scripts.owl_interface.OwlInterface._subscribe_set_pose_callback">[docs]</a>  <span class="k">def</span> <span class="nf">_subscribe_set_pose_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pose</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Subscribes to /owl_interface/set_pose and receives new pose requests.</span>
+<span class="sd">    Then, updates the ontology with that new pose.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">      pose (Location): the new pose.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">armor_client</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_armor_client</span>
+    <span class="n">new_location</span> <span class="o">=</span> <span class="n">Location</span><span class="p">()</span>
+    <span class="n">new_location</span> <span class="o">=</span> <span class="n">pose</span>
+    <span class="n">current_location</span> <span class="o">=</span> <span class="n">Location</span><span class="p">()</span> <span class="c1"># Needed by armor_py_api</span>
+    <span class="n">current_location</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">armor_client</span><span class="o">.</span><span class="n">query</span><span class="o">.</span><span class="n">objectprop_b2_ind</span><span class="p">(</span><span class="s1">&#39;isIn&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">robot_name</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="c1"># Update isIn object property</span>
+    <span class="n">armor_client</span><span class="o">.</span><span class="n">manipulation</span><span class="o">.</span><span class="n">replace_objectprop_b2_ind</span><span class="p">(</span><span class="s1">&#39;isIn&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">robot_name</span><span class="p">,</span>
+                                      <span class="n">new_location</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">current_location</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+    <span class="n">armor_client</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">sync_buffered_reasoner</span><span class="p">()</span>
+    <span class="n">armor_client</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">apply_buffered_changes</span><span class="p">()</span>
+
+    <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Set new pose: </span><span class="si">{</span><span class="n">new_location</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="OwlInterface._publish_goal"><a class="viewcode-back" href="../../index.html#scripts.owl_interface.OwlInterface._publish_goal">[docs]</a>  <span class="k">def</span> <span class="nf">_publish_goal</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Publishes current goal to /owl_interface/goal at a rate defined by the</span>
+<span class="sd">    RATE_GOAL global variable.</span>
+
+<span class="sd">    This runs on a separate thread from the goal search, to avoid slowing down the</span>
+<span class="sd">    publisher in case of lengthy computation times.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">pub_goal</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Publisher</span><span class="p">(</span><span class="s1">&#39;/owl_interface/goal&#39;</span><span class="p">,</span> <span class="n">Location</span><span class="p">,</span> <span class="n">queue_size</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> <span class="n">latch</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span>
+    <span class="n">rate</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Rate</span><span class="p">(</span><span class="n">RATE_GOAL</span><span class="p">)</span>
+    <span class="n">goal_msg</span> <span class="o">=</span> <span class="n">Location</span><span class="p">()</span>
+
+    <span class="k">while</span> <span class="ow">not</span> <span class="n">rospy</span><span class="o">.</span><span class="n">is_shutdown</span><span class="p">():</span>
+      <span class="n">goal_msg</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_current_goal</span>
+      <span class="n">pub_goal</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">goal_msg</span><span class="p">)</span>
+
+      <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Published goal: </span><span class="si">{</span><span class="n">goal_msg</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+
+      <span class="n">rate</span><span class="o">.</span><span class="n">sleep</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="OwlInterface._update_visited"><a class="viewcode-back" href="../../index.html#scripts.owl_interface.OwlInterface._update_visited">[docs]</a>  <span class="k">def</span> <span class="nf">_update_visited</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Updates the visitedAt data property of the passed location through the</span>
+<span class="sd">    /owl_interface/update_visited service.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">      data (Location): the location to update.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">armor_client</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_armor_client</span>
+
+    <span class="c1"># Get current time and old time</span>
+    <span class="n">new_time</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()))</span>
+    <span class="n">old_time</span> <span class="o">=</span> <span class="n">armor_client</span><span class="o">.</span><span class="n">query</span><span class="o">.</span><span class="n">dataprop_b2_ind</span><span class="p">(</span><span class="s1">&#39;visitedAt&#39;</span><span class="p">,</span> <span class="n">data</span><span class="o">.</span><span class="n">location</span><span class="o">.</span><span class="n">name</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="c1"># Trim the value because the ontology returns extra details</span>
+    <span class="n">old_time</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;&quot;(.+?)&quot;&#39;</span><span class="p">,</span> <span class="n">old_time</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="c1"># Update the time</span>
+    <span class="n">armor_client</span><span class="o">.</span><span class="n">manipulation</span><span class="o">.</span><span class="n">remove_dataprop_from_ind</span><span class="p">(</span><span class="s1">&#39;visitedAt&#39;</span><span class="p">,</span> <span class="n">data</span><span class="o">.</span><span class="n">location</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s1">&#39;LONG&#39;</span><span class="p">,</span> <span class="n">old_time</span><span class="p">)</span>
+    <span class="n">armor_client</span><span class="o">.</span><span class="n">manipulation</span><span class="o">.</span><span class="n">add_dataprop_to_ind</span><span class="p">(</span><span class="s1">&#39;visitedAt&#39;</span><span class="p">,</span> <span class="n">data</span><span class="o">.</span><span class="n">location</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s1">&#39;LONG&#39;</span><span class="p">,</span> <span class="n">new_time</span><span class="p">)</span>
+    <span class="n">armor_client</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">sync_buffered_reasoner</span><span class="p">()</span>
+    <span class="n">armor_client</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">apply_buffered_changes</span><span class="p">()</span>
+
+    <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Updated data property visitedAt for location </span><span class="si">{</span><span class="n">data</span><span class="o">.</span><span class="n">location</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="n">Empty</span><span class="p">()</span></div></div>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">OwlInterface</span><span class="p">(</span><span class="s1">&#39;Robot1&#39;</span><span class="p">)</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2022, Alex Thanaphon Leonardi.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
