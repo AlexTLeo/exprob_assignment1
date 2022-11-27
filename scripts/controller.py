@@ -6,10 +6,11 @@
 
 .. moduleauthor:: Alex Thanaphon Leonardi <thanaphon.leonardi@gmail.com>
 
-This module receives a set of waypoints from the :mod:`planner` module and
+This module receives a set of waypoints from the :mod:`behaviour` module (that
+in turn received it from the :mod:`planner` module) and
 physically moves the robot through them. Once the final destination is reached,
 or upon failure, the :mod:`behaviour` module is notified.
-This module also manages the robot battery charging.
+This module also manages the robot's battery charging.
 
 In this simulated program, only adjacent locations are considered reachable,
 therefore the controller only ever has one waypoint to go towards. Therefore,

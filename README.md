@@ -110,11 +110,52 @@ the robot will look for a new goal.
 
 ### Component Diagram
 ![Component Diagram of the system](media/img/compdiag2.png)<br>
+Here, the structure of the ROS nodes can be seen, along with the topics,  
+services and action servers that link them together.
+
 #### Component: OWL Interface
+This component interfaces with the OWL ontology representing both the map and the
+current situation (robot battery, timestamps, etc.). It exposes multiple topics
+and services to allow other nodes to easily interact with the ontology
+whilst hiding the implementation details.
+
+The [ArmorPy API](https://github.com/EmaroLab/armor_py_api) is used
+to facilitate operations.
+
 #### Component: Robot State
+This component interfaces the robot's state with the other nodes. Specifically, it
+shares information regarding the robot pose, the next goal and the battery. It
+also accepts pose updates to update the current pose in the ontology, and accepts
+requests to change the battery mode to *charging* or *discharging*.
+
 #### Component: Controller
+This component receives the plan through an action server (which is comprised of only one goal in this
+simulation) from the **behaviour** component (which in turn received the plan from
+the **planner** component) and moves the robot through it.
+Once the final destination is reached, or upon failure, the **behaviour** module
+is notified.
+
+This component also manages the robot's battery charging.
+
+In this simulated program, only adjacent locations are considered *reachable*,
+so the controller only ever has one waypoint to go towards. Therefore,
+this component simulates work by busy waiting.
+
 #### Component: Planner
+This component receives the next goal from the **behaviour** component (which,
+in turn, received it from the **owl_interface** component) and calculates the
+shortest path to reach that goal, i.e. a set of viapoints.
+These viapoints are then sent to the **controller** component through **behaviour**.
+
+In this simulated program, only adjacent movements are made, therefore the planner does not
+actually have to compute anything and instead simulates work by busy waiting.
+
 #### Component: Behaviour
+This component is the heart of the robot and manages its underlying Finite State
+Machine (FSM).
+The [ROS SMACH library](http://wiki.ros.org/smach) is used to represent the FSM.
+States are non-concurrent and updated at a rate defined by the
+*STATE_UPDATE_PERIOD* global variable.
 
 ### Temporal Diagram
 
@@ -125,8 +166,23 @@ modifying the launch file accordingly.
 
 ## 5. System Analysis
 ### Assumptions
-1. The robot starts in state CHARGING and in room 'E', even though these can be
+1. The robot starts in state CHARGING and in location 'E', even though these can be
 tweaked from the ontology and from the behaviour.py script.
+2. The location 'E' is considered a possible "normal" goal for the robot.
+3. Even if the battry reaches 0, the robot continues working. This is purposeful,
+as it allows the simulation to function even with high battery discharge rates,
+for analysis purposes.
+4. The FSM is non-concurrent, so the robot can only be in one state at any given time.
+5. The robot can freely *teleport* between reachable rooms, as there is no physical model
+to actually control and move.
 ### Current Limitations
-### Possible Improvements
-graph search
+1.
+### Future Improvements
+Currently, only adjacent rooms are considered as viable targets. Therefore, no
+path-planning algorithm has been implemented. The only moment in which the robot
+would need one is if the battery becomes *low* and the robot is in room 'R2' or
+'R4'.
+In this case, a random goal is chosen, because in the current map this will
+inevitably lead the robot to a corridor which is then adjacent to 'E'.
+However, for bigger maps and more complex movements, a path-planning algorithm
+should be implemented, such as the [A* Search Algorithm](https://en.wikipedia.org/wiki/A*_search_algorithm).
