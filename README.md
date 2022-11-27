@@ -44,9 +44,10 @@ The environment is comprised of locations called **rooms** and **corridors**,
 connected to each other by **doors**, and a **robot** that can occupy each of
 these locations one at a time.<br>
 
-A **room** is an entity that can contain the **robot** and it is characterised
+- A **room** is an entity that can contain the **robot** and it is characterised
 by having only *one* **door** connecting it to another location.<br>
-A **corridor** is a **room** with *two or more* **doors**.<br>
+- A **corridor** is a **room** with *two or more* **doors**.<br>
+
 Each location is additionally characterised by a numeric data property called
 *visitedAt* that represents the last moment it has been visited by the **robot**,
 expresed in Unix time (since epoch).\n
