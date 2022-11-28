@@ -270,8 +270,9 @@
 <span class="sd">    The rule for finding the next goal is the following: only adjacent locations</span>
 <span class="sd">    are considered &#39;reachable&#39;. Among these, the most urgent ones are the ones</span>
 <span class="sd">    that were visited a long time ago. If no urgent location is found, a random</span>
-<span class="sd">    one is selected. If the battery is low, only rooms with a charging station</span>
-<span class="sd">    will be selected as acceptable goals.</span>
+<span class="sd">    one is selected, and corridors are preferred.</span>
+<span class="sd">    If the battery is low, only rooms with a charging station will be selected</span>
+<span class="sd">    as acceptable goals.</span>
 
 <span class="sd">    This should be used when precise synchronization is required, as the equivalent</span>
 <span class="sd">    publisher might be slightly slower.</span>
@@ -294,7 +295,14 @@
 
       <span class="c1"># If there are no urgent locations, pick a random reachable location</span>
       <span class="k">if</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">locations_urgent_reachable</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">):</span>
-        <span class="n">goal</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">locations_reachable</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="c1"># First, prefer corridors</span>
+        <span class="n">locations_corridors</span> <span class="o">=</span> <span class="n">armor_client</span><span class="o">.</span><span class="n">query</span><span class="o">.</span><span class="n">ind_b2_class</span><span class="p">(</span><span class="s1">&#39;CORRIDOR&#39;</span><span class="p">)</span>
+        <span class="n">locations_reachable_corridors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">locations_reachable</span><span class="p">)</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="n">locations_corridors</span><span class="p">))</span>
+        <span class="k">if</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">locations_reachable_corridors</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">):</span>
+          <span class="n">goal</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">locations_reachable_corridors</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+          <span class="c1"># Otherwise, get any location</span>
+          <span class="n">goal</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">locations_reachable</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
         <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Picking reachable location: </span><span class="si">{</span><span class="n">goal</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
       <span class="k">else</span><span class="p">:</span>
         <span class="n">goal</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">locations_urgent_reachable</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>

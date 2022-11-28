@@ -41,9 +41,9 @@
 <li><a class="reference internal" href="#assignment-1-documentation">Assignment 1 Documentation</a></li>
 <li><a class="reference internal" href="#module-scripts.controller">Robot Controller Node</a></li>
 <li><a class="reference internal" href="#module-scripts.planner">Robot Planner Node</a></li>
-<li><a class="reference internal" href="#robot-behaviour-node">Robot Behaviour Node</a></li>
+<li><a class="reference internal" href="#module-scripts.behaviour">Robot Behaviour Node</a></li>
 <li><a class="reference internal" href="#module-scripts.robot_state">Robot State Node</a></li>
-<li><a class="reference internal" href="#owl-ontology-interface-node">OWL Ontology Interface Node</a></li>
+<li><a class="reference internal" href="#module-scripts.owl_interface">OWL Ontology Interface Node</a></li>
 </ul>
 </div>
         </div>
@@ -85,10 +85,11 @@ while the ontology is implemented through the <a class="reference external" href
 </div>
 <div class="section" id="module-scripts.controller">
 <span id="robot-controller-node"></span><h1>Robot Controller Node<a class="headerlink" href="#module-scripts.controller" title="Permalink to this headline"></a></h1>
-<p>This module receives a set of waypoints from the <code class="xref py py-mod docutils literal notranslate"><span class="pre">planner</span></code> module and
+<p>This module receives a set of waypoints from the <code class="xref py py-mod docutils literal notranslate"><span class="pre">behaviour</span></code> module (that
+in turn received it from the <code class="xref py py-mod docutils literal notranslate"><span class="pre">planner</span></code> module) and
 physically moves the robot through them. Once the final destination is reached,
 or upon failure, the <code class="xref py py-mod docutils literal notranslate"><span class="pre">behaviour</span></code> module is notified.
-This module also manages the robot battery charging.</p>
+This module also manages the robot’s battery charging.</p>
 <p>In this simulated program, only adjacent locations are considered reachable,
 therefore the controller only ever has one waypoint to go towards. Therefore,
 this module simulates work by busy waiting.</p>
@@ -97,7 +98,7 @@ this module simulates work by busy waiting.</p>
 </dd>
 <dt>Subscribes to:</dt><dd><p><strong>/state/battery_level</strong> gets the current battery level.</p>
 </dd>
-<dt>Service:</dt><dd><p><strong>/state/battery/set_mode</strong> sets the battery to either charge or discharge.</p>
+<dt>ServiceProxy:</dt><dd><p><strong>/state/battery/set_mode</strong> sets the battery to either charge or discharge.</p>
 <p><strong>/owl_interface/update_visited</strong> updates the timestamp associated to a location.</p>
 </dd>
 <dt>Action Server:</dt><dd><p><strong>/motion/controller/move</strong> given a set of viapoints, moves the robot through them.</p>
@@ -256,7 +257,7 @@ simply bounces the goal back to the behaviour node, which in turn will send
 it to the /motion/controller/move action server.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><p><strong>goal</strong> (<em>PlanGoal</em>) – the goal location</p>
+<dd class="field-odd"><p><strong>goal</strong> (<a class="reference internal" href="#scripts.behaviour.PlanGoal" title="scripts.behaviour.PlanGoal"><em>PlanGoal</em></a>) – the goal location</p>
 </dd>
 </dl>
 <div class="admonition note">
@@ -269,8 +270,186 @@ to find the optimal path towards the goal.</p>
 </dd></dl>
 
 </div>
-<div class="section" id="robot-behaviour-node">
-<h1>Robot Behaviour Node<a class="headerlink" href="#robot-behaviour-node" title="Permalink to this headline"></a></h1>
+<div class="section" id="module-scripts.behaviour">
+<span id="robot-behaviour-node"></span><h1>Robot Behaviour Node<a class="headerlink" href="#module-scripts.behaviour" title="Permalink to this headline"></a></h1>
+<p>This module manages the underlying Finite State Machine (FSM) of the program.
+The <a class="reference external" href="http://wiki.ros.org/smach">ROS SMACH library</a> is used to represent the FSM.
+States are non-concurrent and updated at a rate defined by the
+STATE_UPDATE_PERIOD global variable.</p>
+<dl>
+<dt>ROS Parameters:</dt><dd><p><strong>/battery/threshold_low</strong> the threshold below which the battery should be considered as ‘low’.</p>
+<p><strong>/battery/threshold_critical</strong> the threshold below which the battery should be considered as ‘critical’.</p>
+</dd>
+<dt>Subscribes to:</dt><dd><p><strong>/state/battery_level</strong> receive the robot’s current battery level.</p>
+</dd>
+<dt>Service Proxy:</dt><dd><p><strong>/owl_interface/get_goal</strong> get the next goal.</p>
+<p><strong>/owl_interface/get_pose</strong> get the current pose.</p>
+</dd>
+<dt>Action Client:</dt><dd><p><strong>/battery/controller/charge</strong> requests the robot go into charging mode.</p>
+<p><strong>/motion/planner</strong> request a plan for the given goal.</p>
+<p><strong>/motion/controller/move</strong> move the robot.</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Some variables may be concurrently accessed and are therefore protected by
+<a class="reference external" href="https://docs.python.org/3/library/threading.html">locks</a>.
+Extra care should be used if touching these variables (is_battery_low and
+is_battery_critical).</p>
+</div>
+<dl class="py class">
+<dt class="sig sig-object py" id="scripts.behaviour.Charging">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">scripts.behaviour.</span></span><span class="sig-name descname"><span class="pre">Charging</span></span><a class="reference internal" href="_modules/scripts/behaviour.html#Charging"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.behaviour.Charging" title="Permalink to this definition"></a></dt>
+<dd><p>This class represents the CHARGING state of the state machine, in which the
+robot is actively recharging its battery at charging station.</p>
+<p>The robot has three battery thresholds: charged, low_battery, critical.</p>
+<ul class="simple">
+<li><p>If charged, the robot can operate normally.</p></li>
+<li><p>If low_battery, the robot keeps working until the current task is completed,
+and then goes to a charging state immediately after.</p></li>
+<li><p>If critical, the robot interrupts whatever it is doing and immediately goes
+to a charging station.</p></li>
+</ul>
+<dl class="py method">
+<dt class="sig sig-object py" id="scripts.behaviour.Charging._charge_battery">
+<span class="sig-name descname"><span class="pre">_charge_battery</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/behaviour.html#Charging._charge_battery"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.behaviour.Charging._charge_battery" title="Permalink to this definition"></a></dt>
+<dd><p>Requests the controller to charge the robot, via the /battery/controller/charge
+action server.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="scripts.behaviour.Charging.execute">
+<span class="sig-name descname"><span class="pre">execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">userdata</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/behaviour.html#Charging.execute"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.behaviour.Charging.execute" title="Permalink to this definition"></a></dt>
+<dd><p>Every STATE_UPDATE_PERIOD, check if the battery is low or not. If so, then
+check if the current room has a charging station. If so, transition to state
+CHARGING. Otherwise, if current room has no charging station, or if the
+robot has been fully charged, transition to PLAN_GOAL.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="scripts.behaviour.Moving">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">scripts.behaviour.</span></span><span class="sig-name descname"><span class="pre">Moving</span></span><a class="reference internal" href="_modules/scripts/behaviour.html#Moving"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.behaviour.Moving" title="Permalink to this definition"></a></dt>
+<dd><p>This class represents the MOVING state of the state machine, in which the robot,
+having received a plan from the Planner, physically moves towards the goal via
+the Controller.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="scripts.behaviour.Moving._activate_controller_move">
+<span class="sig-name descname"><span class="pre">_activate_controller_move</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">plan</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/behaviour.html#Moving._activate_controller_move"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.behaviour.Moving._activate_controller_move" title="Permalink to this definition"></a></dt>
+<dd><p>Pass the current plan to the Controller via the /motion/controller/move
+action server.
+If the battery is low, transition to the CHARGING state.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="scripts.behaviour.Moving.execute">
+<span class="sig-name descname"><span class="pre">execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">userdata</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/behaviour.html#Moving.execute"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.behaviour.Moving.execute" title="Permalink to this definition"></a></dt>
+<dd><p>Activate the movement controller and send it the plan. If the battery is low,
+transition to state CHARGING. If the goal is not reached, transition to
+state PLAN_GOAL. If te goal is successfully reached, transition to state
+WAITING.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="scripts.behaviour.PlanGoal">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">scripts.behaviour.</span></span><span class="sig-name descname"><span class="pre">PlanGoal</span></span><a class="reference internal" href="_modules/scripts/behaviour.html#PlanGoal"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.behaviour.PlanGoal" title="Permalink to this definition"></a></dt>
+<dd><p>This class represents the PLAN_GOAL state of the state machine, in which the
+robot looks for the next location to move towards.
+Once chosen, the robot will plan a path to it by finding the shortest known path,
+which it infers from the ontology.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="scripts.behaviour.PlanGoal._request_plan">
+<span class="sig-name descname"><span class="pre">_request_plan</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">goal</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/behaviour.html#PlanGoal._request_plan"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.behaviour.PlanGoal._request_plan" title="Permalink to this definition"></a></dt>
+<dd><p>Requests a plan from the Planner by sending it a goal, through the
+/motion/planner/ action server.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>goal</strong> (<em>Location</em>) – the final location to reach.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="scripts.behaviour.PlanGoal._srv_get_goal">
+<span class="sig-name descname"><span class="pre">_srv_get_goal</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/behaviour.html#PlanGoal._srv_get_goal"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.behaviour.PlanGoal._srv_get_goal" title="Permalink to this definition"></a></dt>
+<dd><p>Get the next goal by calling the /owl_interface/get_goal service.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Raises</dt>
+<dd class="field-odd"><p><strong>rospy.ServiceException - indicates failure to call service.</strong> – </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="scripts.behaviour.PlanGoal.execute">
+<span class="sig-name descname"><span class="pre">execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">userdata</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/behaviour.html#PlanGoal.execute"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.behaviour.PlanGoal.execute" title="Permalink to this definition"></a></dt>
+<dd><p>Request a plan for the current goal. When received, transition to the MOVING
+state.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="scripts.behaviour.Waiting">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">scripts.behaviour.</span></span><span class="sig-name descname"><span class="pre">Waiting</span></span><a class="reference internal" href="_modules/scripts/behaviour.html#Waiting"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.behaviour.Waiting" title="Permalink to this definition"></a></dt>
+<dd><p>This class represents the WAITING state of the state machine, in which the robot,
+having reached its goal, waits for a random amount of time before going back
+to the MOVING state.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="scripts.behaviour.Waiting._simulate_work">
+<span class="sig-name descname"><span class="pre">_simulate_work</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/behaviour.html#Waiting._simulate_work"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.behaviour.Waiting._simulate_work" title="Permalink to this definition"></a></dt>
+<dd><p>Simulate work by sleeping for some seconds.
+This is split up into multiple smaller waits so that it may be preempted
+in case of critically low battery.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="scripts.behaviour.Waiting.execute">
+<span class="sig-name descname"><span class="pre">execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">userdata</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/behaviour.html#Waiting.execute"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.behaviour.Waiting.execute" title="Permalink to this definition"></a></dt>
+<dd><p>While waiting, keep checking if the battery gets too low. If it goes below
+the critical threshold, then interrupt the waiting and transition to the
+CHARGING state.</p>
+<p>When done waiting, transition to the PLAN_GOAL state.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="scripts.behaviour.init_state_machine">
+<span class="sig-prename descclassname"><span class="pre">scripts.behaviour.</span></span><span class="sig-name descname"><span class="pre">init_state_machine</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/behaviour.html#init_state_machine"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.behaviour.init_state_machine" title="Permalink to this definition"></a></dt>
+<dd><p>This function initialises, configures, and runs the state machine.
+The Introspection Server is also started to allow the state machine to be
+visualised via the <a class="reference external" href="http://wiki.ros.org/smach">ROS SMACH library</a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>the introspection server handler.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>introspec_server (IntrospectionServer)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="scripts.behaviour.main">
+<span class="sig-prename descclassname"><span class="pre">scripts.behaviour.</span></span><span class="sig-name descname"><span class="pre">main</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/behaviour.html#main"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.behaviour.main" title="Permalink to this definition"></a></dt>
+<dd><p>This represents the main function, in which the state machine is initialised,
+configured and run. The Introspection Server is also started to allow the
+state machine to be visualised via the <a class="reference external" href="http://wiki.ros.org/smach">ROS SMACH library</a>.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="scripts.behaviour.subscribe_battery_callback">
+<span class="sig-prename descclassname"><span class="pre">scripts.behaviour.</span></span><span class="sig-name descname"><span class="pre">subscribe_battery_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/behaviour.html#subscribe_battery_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.behaviour.subscribe_battery_callback" title="Permalink to this definition"></a></dt>
+<dd><p>Subscribes to the /state/battery_level topic and gets the current battery level.</p>
+<p>This callback remains active the entire time, and never shuts down. State
+transitions do not affect it (the alternative would be to have the same
+function repeated in each and every state, which is unnecessary and bad).</p>
+</dd></dl>
+
 </div>
 <div class="section" id="module-scripts.robot_state">
 <span id="robot-state-node"></span><h1>Robot State Node<a class="headerlink" href="#module-scripts.robot_state" title="Permalink to this headline"></a></h1>
@@ -368,9 +547,9 @@ requests to change the battery mode to charging or discharging.</p>
 </dd></dl>
 
 </div>
-<div class="section" id="owl-ontology-interface-node">
-<h1>OWL Ontology Interface Node<a class="headerlink" href="#owl-ontology-interface-node" title="Permalink to this headline"></a></h1>
-<span class="target" id="module-scripts.owl_interface"></span><p>This module interfaces with the OWL ontology representing both the map and the
+<div class="section" id="module-scripts.owl_interface">
+<span id="owl-ontology-interface-node"></span><h1>OWL Ontology Interface Node<a class="headerlink" href="#module-scripts.owl_interface" title="Permalink to this headline"></a></h1>
+<p>This module interfaces with the OWL ontology representing both the map and the
 current situation (robot battery, timestamps, etc.). It exposes multiple publishers,
 subscribers and services to allow other nodes to interact with the ontology
 whilst hiding the implementation details.</p>
@@ -456,8 +635,9 @@ service and returns it to the service caller.</p>
 <p>The rule for finding the next goal is the following: only adjacent locations
 are considered ‘reachable’. Among these, the most urgent ones are the ones
 that were visited a long time ago. If no urgent location is found, a random
-one is selected. If the battery is low, only rooms with a charging station
-will be selected as acceptable goals.</p>
+one is selected, and corridors are preferred.
+If the battery is low, only rooms with a charging station will be selected
+as acceptable goals.</p>
 <p>This should be used when precise synchronization is required, as the equivalent
 publisher might be slightly slower.</p>
 <dl class="field-list simple">

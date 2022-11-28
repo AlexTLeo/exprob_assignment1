@@ -107,6 +107,8 @@
 
 <span class="n">LOG_TAG</span> <span class="o">=</span> <span class="s1">&#39;robot_state&#39;</span>
 
+<span class="n">STARTING_BATTERY_LEVEL</span> <span class="o">=</span> <span class="mf">100.0</span> <span class="c1"># battery can go from 0.0 to 100.0</span>
+
 <div class="viewcode-block" id="RobotState"><a class="viewcode-back" href="../../index.html#scripts.robot_state.RobotState">[docs]</a><span class="k">class</span> <span class="nc">RobotState</span><span class="p">:</span>
   <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">  This class implements the aforementioned functionalities.</span>
@@ -119,7 +121,7 @@
     <span class="c1"># Initialisation</span>
     <span class="n">rospy</span><span class="o">.</span><span class="n">init_node</span><span class="p">(</span><span class="s1">&#39;robot_state&#39;</span><span class="p">,</span> <span class="n">anonymous</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_pose</span> <span class="o">=</span> <span class="kc">None</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_battery</span><span class="o">.</span><span class="n">battery_level</span> <span class="o">=</span> <span class="mf">50.0</span> <span class="c1"># battery can go from 0.0 to 100.0</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_battery</span><span class="o">.</span><span class="n">battery_level</span> <span class="o">=</span> <span class="n">STARTING_BATTERY_LEVEL</span>
 
     <span class="c1"># Set default parameter values, in case not specified by launch file</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">rospy</span><span class="o">.</span><span class="n">has_param</span><span class="p">(</span><span class="s1">&#39;robot_state/battery_tick&#39;</span><span class="p">):</span>

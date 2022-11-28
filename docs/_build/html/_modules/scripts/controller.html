@@ -70,10 +70,11 @@
 
 <span class="sd">.. moduleauthor:: Alex Thanaphon Leonardi &lt;thanaphon.leonardi@gmail.com&gt;</span>
 
-<span class="sd">This module receives a set of waypoints from the :mod:`planner` module and</span>
+<span class="sd">This module receives a set of waypoints from the :mod:`behaviour` module (that</span>
+<span class="sd">in turn received it from the :mod:`planner` module) and</span>
 <span class="sd">physically moves the robot through them. Once the final destination is reached,</span>
 <span class="sd">or upon failure, the :mod:`behaviour` module is notified.</span>
-<span class="sd">This module also manages the robot battery charging.</span>
+<span class="sd">This module also manages the robot&#39;s battery charging.</span>
 
 <span class="sd">In this simulated program, only adjacent locations are considered reachable,</span>
 <span class="sd">therefore the controller only ever has one waypoint to go towards. Therefore,</span>
@@ -85,7 +86,7 @@
 <span class="sd">Subscribes to:</span>
 <span class="sd">  **/state/battery_level** gets the current battery level.</span>
 
-<span class="sd">Service:</span>
+<span class="sd">ServiceProxy:</span>
 <span class="sd">  **/state/battery/set_mode** sets the battery to either charge or discharge.\n</span>
 <span class="sd">  **/owl_interface/update_visited** updates the timestamp associated to a location.</span>
 

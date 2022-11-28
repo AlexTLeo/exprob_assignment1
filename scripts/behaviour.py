@@ -8,7 +8,7 @@
 .. moduleauthor::Alex Thanaphon Leonardi <thanaphon.leonardi@gmail.com>
 
 This module manages the underlying Finite State Machine (FSM) of the program.
-The `ROS SMACH library <http://wiki.ros.org/smach>_` is used to represent the FSM.
+The `ROS SMACH library <http://wiki.ros.org/smach>`_ is used to represent the FSM.
 States are non-concurrent and updated at a rate defined by the
 STATE_UPDATE_PERIOD global variable.
 
@@ -128,8 +128,9 @@ class Charging(smach.State):
   def execute(self, userdata):
     """
     Every STATE_UPDATE_PERIOD, check if the battery is low or not. If so, then
-    check if the current room has a charging station. If so, then request the
-    /battery/controller/charge action server to charge the robot.
+    check if the current room has a charging station. If so, transition to state
+    CHARGING. Otherwise, if current room has no charging station, or if the
+    robot has been fully charged, transition to PLAN_GOAL.
     """
     rospy.sleep(STATE_UPDATE_PERIOD)
 
@@ -280,7 +281,12 @@ class Moving(smach.State):
     return self._controller_success
 
   def execute(self, userdata):
-    # Activate the controller and give it the plan
+    """
+    Activate the movement controller and send it the plan. If the battery is low,
+    transition to state CHARGING. If the goal is not reached, transition to
+    state PLAN_GOAL. If te goal is successfully reached, transition to state
+    WAITING.
+    """
     self._activate_controller_move(userdata.plan_to_goal)
 
     rospy.sleep(STATE_UPDATE_PERIOD)
@@ -307,7 +313,7 @@ class Waiting(smach.State):
   having reached its goal, waits for a random amount of time before going back
   to the MOVING state.
   """
-  
+
   global is_battery_low
   global is_battery_critical
 
