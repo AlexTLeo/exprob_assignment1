@@ -35,8 +35,15 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">Robot Controller Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html#module-scripts.planner">Robot Planner Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html#module-scripts.behaviour">Robot Behaviour Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html#module-scripts.robot_state">Robot State Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html#module-scripts.owl_interface">OWL Ontology Interface Node</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -143,7 +150,7 @@
 <span class="n">is_battery_critical</span> <span class="o">=</span> <span class="kc">False</span>
 
 <span class="c1"># state: CHARGING</span>
-<div class="viewcode-block" id="Charging"><a class="viewcode-back" href="../../index.html#scripts.behaviour.Charging">[docs]</a><span class="k">class</span> <span class="nc">Charging</span><span class="p">(</span><span class="n">smach</span><span class="o">.</span><span class="n">State</span><span class="p">):</span>
+<div class="viewcode-block" id="Charging"><a class="viewcode-back" href="../../modules.html#scripts.behaviour.Charging">[docs]</a><span class="k">class</span> <span class="nc">Charging</span><span class="p">(</span><span class="n">smach</span><span class="o">.</span><span class="n">State</span><span class="p">):</span>
   <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">  This class represents the CHARGING state of the state machine, in which the</span>
 <span class="sd">  robot is actively recharging its battery at charging station.</span>
@@ -173,7 +180,7 @@
     <span class="n">rospy</span><span class="o">.</span><span class="n">wait_for_service</span><span class="p">(</span><span class="s1">&#39;/owl_interface/get_pose&#39;</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_srv_get_pose</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">ServiceProxy</span><span class="p">(</span><span class="s1">&#39;/owl_interface/get_pose&#39;</span><span class="p">,</span> <span class="n">GetPose</span><span class="p">)</span>
 
-<div class="viewcode-block" id="Charging._charge_battery"><a class="viewcode-back" href="../../index.html#scripts.behaviour.Charging._charge_battery">[docs]</a>  <span class="k">def</span> <span class="nf">_charge_battery</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="Charging._charge_battery"><a class="viewcode-back" href="../../modules.html#scripts.behaviour.Charging._charge_battery">[docs]</a>  <span class="k">def</span> <span class="nf">_charge_battery</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Requests the controller to charge the robot, via the /battery/controller/charge</span>
 <span class="sd">    action server.</span>
@@ -189,7 +196,7 @@
     <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="s1">&#39;Charger has stopped&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_act_client_charge</span><span class="o">.</span><span class="n">get_result</span><span class="p">()</span></div>
 
-<div class="viewcode-block" id="Charging.execute"><a class="viewcode-back" href="../../index.html#scripts.behaviour.Charging.execute">[docs]</a>  <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">userdata</span><span class="p">):</span>
+<div class="viewcode-block" id="Charging.execute"><a class="viewcode-back" href="../../modules.html#scripts.behaviour.Charging.execute">[docs]</a>  <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">userdata</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Every STATE_UPDATE_PERIOD, check if the battery is low or not. If so, then</span>
 <span class="sd">    check if the current room has a charging station. If so, transition to state</span>
@@ -222,7 +229,7 @@
       <span class="k">return</span> <span class="n">TRANS_PLAN_GOAL</span></div></div>
 
 <span class="c1"># state: PLAN_GOAL</span>
-<div class="viewcode-block" id="PlanGoal"><a class="viewcode-back" href="../../index.html#scripts.behaviour.PlanGoal">[docs]</a><span class="k">class</span> <span class="nc">PlanGoal</span><span class="p">(</span><span class="n">smach</span><span class="o">.</span><span class="n">State</span><span class="p">):</span>
+<div class="viewcode-block" id="PlanGoal"><a class="viewcode-back" href="../../modules.html#scripts.behaviour.PlanGoal">[docs]</a><span class="k">class</span> <span class="nc">PlanGoal</span><span class="p">(</span><span class="n">smach</span><span class="o">.</span><span class="n">State</span><span class="p">):</span>
   <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">  This class represents the PLAN_GOAL state of the state machine, in which the</span>
 <span class="sd">  robot looks for the next location to move towards.</span>
@@ -245,7 +252,7 @@
     <span class="n">rospy</span><span class="o">.</span><span class="n">wait_for_service</span><span class="p">(</span><span class="s1">&#39;/owl_interface/get_goal&#39;</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_srv_get_goal</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">ServiceProxy</span><span class="p">(</span><span class="s1">&#39;/owl_interface/get_goal&#39;</span><span class="p">,</span> <span class="n">GetGoal</span><span class="p">)</span>
 
-<div class="viewcode-block" id="PlanGoal._request_plan"><a class="viewcode-back" href="../../index.html#scripts.behaviour.PlanGoal._request_plan">[docs]</a>  <span class="k">def</span> <span class="nf">_request_plan</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">goal</span><span class="p">):</span>
+<div class="viewcode-block" id="PlanGoal._request_plan"><a class="viewcode-back" href="../../modules.html#scripts.behaviour.PlanGoal._request_plan">[docs]</a>  <span class="k">def</span> <span class="nf">_request_plan</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">goal</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Requests a plan from the Planner by sending it a goal, through the</span>
 <span class="sd">    /motion/planner/ action server.</span>
@@ -265,7 +272,7 @@
                                 <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_act_client</span><span class="o">.</span><span class="n">get_result</span><span class="p">()</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_current_plan</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_act_client</span><span class="o">.</span><span class="n">get_result</span><span class="p">()</span></div>
 
-<div class="viewcode-block" id="PlanGoal._srv_get_goal"><a class="viewcode-back" href="../../index.html#scripts.behaviour.PlanGoal._srv_get_goal">[docs]</a>  <span class="k">def</span> <span class="nf">_srv_get_goal</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="PlanGoal._srv_get_goal"><a class="viewcode-back" href="../../modules.html#scripts.behaviour.PlanGoal._srv_get_goal">[docs]</a>  <span class="k">def</span> <span class="nf">_srv_get_goal</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Get the next goal by calling the /owl_interface/get_goal service.</span>
 
@@ -279,7 +286,7 @@
       <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Failed to get goal: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
       <span class="k">return</span> <span class="s1">&#39;&#39;</span></div>
 
-<div class="viewcode-block" id="PlanGoal.execute"><a class="viewcode-back" href="../../index.html#scripts.behaviour.PlanGoal.execute">[docs]</a>  <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">userdata</span><span class="p">):</span>
+<div class="viewcode-block" id="PlanGoal.execute"><a class="viewcode-back" href="../../modules.html#scripts.behaviour.PlanGoal.execute">[docs]</a>  <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">userdata</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Request a plan for the current goal. When received, transition to the MOVING</span>
 <span class="sd">    state.</span>
@@ -303,7 +310,7 @@
       <span class="k">return</span> <span class="n">TRANS_MOVE_TO_GOAL</span></div></div>
 
 <span class="c1"># state: MOVING</span>
-<div class="viewcode-block" id="Moving"><a class="viewcode-back" href="../../index.html#scripts.behaviour.Moving">[docs]</a><span class="k">class</span> <span class="nc">Moving</span><span class="p">(</span><span class="n">smach</span><span class="o">.</span><span class="n">State</span><span class="p">):</span>
+<div class="viewcode-block" id="Moving"><a class="viewcode-back" href="../../modules.html#scripts.behaviour.Moving">[docs]</a><span class="k">class</span> <span class="nc">Moving</span><span class="p">(</span><span class="n">smach</span><span class="o">.</span><span class="n">State</span><span class="p">):</span>
   <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">  This class represents the MOVING state of the state machine, in which the robot,</span>
 <span class="sd">  having received a plan from the Planner, physically moves towards the goal via</span>
@@ -323,7 +330,7 @@
                                    <span class="n">TRANS_PLAN_GOAL</span><span class="p">],</span>
                          <span class="n">input_keys</span><span class="o">=</span><span class="p">[</span><span class="n">VAR_PLAN_TO_GOAL</span><span class="p">])</span>
 
-<div class="viewcode-block" id="Moving._activate_controller_move"><a class="viewcode-back" href="../../index.html#scripts.behaviour.Moving._activate_controller_move">[docs]</a>  <span class="k">def</span> <span class="nf">_activate_controller_move</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">plan</span><span class="p">):</span>
+<div class="viewcode-block" id="Moving._activate_controller_move"><a class="viewcode-back" href="../../modules.html#scripts.behaviour.Moving._activate_controller_move">[docs]</a>  <span class="k">def</span> <span class="nf">_activate_controller_move</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">plan</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Pass the current plan to the Controller via the /motion/controller/move</span>
 <span class="sd">    action server.</span>
@@ -344,7 +351,7 @@
 
     <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_controller_success</span></div>
 
-<div class="viewcode-block" id="Moving.execute"><a class="viewcode-back" href="../../index.html#scripts.behaviour.Moving.execute">[docs]</a>  <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">userdata</span><span class="p">):</span>
+<div class="viewcode-block" id="Moving.execute"><a class="viewcode-back" href="../../modules.html#scripts.behaviour.Moving.execute">[docs]</a>  <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">userdata</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Activate the movement controller and send it the plan. If the battery is low,</span>
 <span class="sd">    transition to state CHARGING. If the goal is not reached, transition to</span>
@@ -371,7 +378,7 @@
       <span class="k">return</span> <span class="n">TRANS_PLAN_GOAL</span></div></div>
 
 <span class="c1"># state: WAITING</span>
-<div class="viewcode-block" id="Waiting"><a class="viewcode-back" href="../../index.html#scripts.behaviour.Waiting">[docs]</a><span class="k">class</span> <span class="nc">Waiting</span><span class="p">(</span><span class="n">smach</span><span class="o">.</span><span class="n">State</span><span class="p">):</span>
+<div class="viewcode-block" id="Waiting"><a class="viewcode-back" href="../../modules.html#scripts.behaviour.Waiting">[docs]</a><span class="k">class</span> <span class="nc">Waiting</span><span class="p">(</span><span class="n">smach</span><span class="o">.</span><span class="n">State</span><span class="p">):</span>
   <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">  This class represents the WAITING state of the state machine, in which the robot,</span>
 <span class="sd">  having reached its goal, waits for a random amount of time before going back</span>
@@ -387,7 +394,7 @@
                                    <span class="n">TRANS_LOW_BATTERY</span><span class="p">,</span>
                                    <span class="n">TRANS_GOAL_REACHED</span><span class="p">])</span>
 
-<div class="viewcode-block" id="Waiting._simulate_work"><a class="viewcode-back" href="../../index.html#scripts.behaviour.Waiting._simulate_work">[docs]</a>  <span class="k">def</span> <span class="nf">_simulate_work</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="Waiting._simulate_work"><a class="viewcode-back" href="../../modules.html#scripts.behaviour.Waiting._simulate_work">[docs]</a>  <span class="k">def</span> <span class="nf">_simulate_work</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Simulate work by sleeping for some seconds.</span>
 <span class="sd">    This is split up into multiple smaller waits so that it may be preempted</span>
@@ -404,7 +411,7 @@
         <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;(</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s1"> -&gt; </span><span class="si">{</span><span class="n">total_time</span><span class="si">}</span><span class="s1">) Working...&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
         <span class="n">rospy</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="Waiting.execute"><a class="viewcode-back" href="../../index.html#scripts.behaviour.Waiting.execute">[docs]</a>  <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">userdata</span><span class="p">):</span>
+<div class="viewcode-block" id="Waiting.execute"><a class="viewcode-back" href="../../modules.html#scripts.behaviour.Waiting.execute">[docs]</a>  <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">userdata</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    While waiting, keep checking if the battery gets too low. If it goes below</span>
 <span class="sd">    the critical threshold, then interrupt the waiting and transition to the</span>
@@ -434,7 +441,7 @@
 
     <span class="k">return</span> <span class="n">TRANS_PLAN_GOAL</span></div></div>
 
-<div class="viewcode-block" id="init_state_machine"><a class="viewcode-back" href="../../index.html#scripts.behaviour.init_state_machine">[docs]</a><span class="k">def</span> <span class="nf">init_state_machine</span><span class="p">():</span>
+<div class="viewcode-block" id="init_state_machine"><a class="viewcode-back" href="../../modules.html#scripts.behaviour.init_state_machine">[docs]</a><span class="k">def</span> <span class="nf">init_state_machine</span><span class="p">():</span>
   <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">  This function initialises, configures, and runs the state machine.</span>
 <span class="sd">  The Introspection Server is also started to allow the state machine to be</span>
@@ -476,7 +483,7 @@
 
   <span class="k">return</span> <span class="n">introspec_server</span></div>
 
-<div class="viewcode-block" id="subscribe_battery_callback"><a class="viewcode-back" href="../../index.html#scripts.behaviour.subscribe_battery_callback">[docs]</a><span class="k">def</span> <span class="nf">subscribe_battery_callback</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+<div class="viewcode-block" id="subscribe_battery_callback"><a class="viewcode-back" href="../../modules.html#scripts.behaviour.subscribe_battery_callback">[docs]</a><span class="k">def</span> <span class="nf">subscribe_battery_callback</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
   <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">  Subscribes to the /state/battery_level topic and gets the current battery level.</span>
 
@@ -513,7 +520,7 @@
 
   <span class="n">rospy</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">BATTERY_STATUS_PERIOD</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="main"><a class="viewcode-back" href="../../index.html#scripts.behaviour.main">[docs]</a><span class="k">def</span> <span class="nf">main</span><span class="p">():</span>
+<div class="viewcode-block" id="main"><a class="viewcode-back" href="../../modules.html#scripts.behaviour.main">[docs]</a><span class="k">def</span> <span class="nf">main</span><span class="p">():</span>
   <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">  This represents the main function, in which the state machine is initialised,</span>
 <span class="sd">  configured and run. The Introspection Server is also started to allow the</span>

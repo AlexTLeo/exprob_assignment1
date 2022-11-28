@@ -35,8 +35,15 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">Robot Controller Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html#module-scripts.planner">Robot Planner Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html#module-scripts.behaviour">Robot Behaviour Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html#module-scripts.robot_state">Robot State Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html#module-scripts.owl_interface">OWL Ontology Interface Node</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -109,7 +116,7 @@
 
 <span class="n">STARTING_BATTERY_LEVEL</span> <span class="o">=</span> <span class="mf">100.0</span> <span class="c1"># battery can go from 0.0 to 100.0</span>
 
-<div class="viewcode-block" id="RobotState"><a class="viewcode-back" href="../../index.html#scripts.robot_state.RobotState">[docs]</a><span class="k">class</span> <span class="nc">RobotState</span><span class="p">:</span>
+<div class="viewcode-block" id="RobotState"><a class="viewcode-back" href="../../modules.html#scripts.robot_state.RobotState">[docs]</a><span class="k">class</span> <span class="nc">RobotState</span><span class="p">:</span>
   <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">  This class implements the aforementioned functionalities.</span>
 <span class="sd">  &quot;&quot;&quot;</span>
@@ -163,7 +170,7 @@
     <span class="n">log_msg</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;Initialised node: robot_state&#39;</span><span class="p">)</span>
     <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="n">log_msg</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
 
-<div class="viewcode-block" id="RobotState._subscribe_goal_callback"><a class="viewcode-back" href="../../index.html#scripts.robot_state.RobotState._subscribe_goal_callback">[docs]</a>  <span class="k">def</span> <span class="nf">_subscribe_goal_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">goal</span><span class="p">):</span>
+<div class="viewcode-block" id="RobotState._subscribe_goal_callback"><a class="viewcode-back" href="../../modules.html#scripts.robot_state.RobotState._subscribe_goal_callback">[docs]</a>  <span class="k">def</span> <span class="nf">_subscribe_goal_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">goal</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Subscribes to /owl_interface/goal and gets the next goal. Then, republishes the goal on the /state/map/get_goal topic.</span>
 
@@ -175,7 +182,7 @@
     <span class="n">log_msg</span> <span class="o">=</span> <span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Goal received and republished: </span><span class="si">{</span><span class="n">goal</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
     <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="n">log_msg</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span></div>
 
-<div class="viewcode-block" id="RobotState._subscribe_get_pose_callback"><a class="viewcode-back" href="../../index.html#scripts.robot_state.RobotState._subscribe_get_pose_callback">[docs]</a>  <span class="k">def</span> <span class="nf">_subscribe_get_pose_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pose</span><span class="p">):</span>
+<div class="viewcode-block" id="RobotState._subscribe_get_pose_callback"><a class="viewcode-back" href="../../modules.html#scripts.robot_state.RobotState._subscribe_get_pose_callback">[docs]</a>  <span class="k">def</span> <span class="nf">_subscribe_get_pose_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pose</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Subscribes to /state/get_pose and gets the current pose. Then, republishes the pose on the /state/get_pose topic.</span>
 
@@ -189,7 +196,7 @@
     <span class="n">log_msg</span> <span class="o">=</span> <span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Current pose received and republished: </span><span class="si">{</span><span class="n">current_location</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
     <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="n">log_msg</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span></div>
 
-<div class="viewcode-block" id="RobotState._subscribe_set_pose_callback"><a class="viewcode-back" href="../../index.html#scripts.robot_state.RobotState._subscribe_set_pose_callback">[docs]</a>  <span class="k">def</span> <span class="nf">_subscribe_set_pose_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pose</span><span class="p">):</span>
+<div class="viewcode-block" id="RobotState._subscribe_set_pose_callback"><a class="viewcode-back" href="../../modules.html#scripts.robot_state.RobotState._subscribe_set_pose_callback">[docs]</a>  <span class="k">def</span> <span class="nf">_subscribe_set_pose_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pose</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Subscribes to /state/set_pose and gets the requested pose. Then, republishes the pose on the /owl_interface/set_pose topic, which will be used by the :mod:`owl_interface` module to change the pose in the ontology.</span>
 
@@ -203,7 +210,7 @@
     <span class="n">log_msg</span> <span class="o">=</span> <span class="p">(</span><span class="sa">f</span><span class="s1">&#39;New pose received and republished: </span><span class="si">{</span><span class="n">new_location</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
     <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="n">log_msg</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span></div>
 
-<div class="viewcode-block" id="RobotState._battery_set_mode"><a class="viewcode-back" href="../../index.html#scripts.robot_state.RobotState._battery_set_mode">[docs]</a>  <span class="k">def</span> <span class="nf">_battery_set_mode</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+<div class="viewcode-block" id="RobotState._battery_set_mode"><a class="viewcode-back" href="../../modules.html#scripts.robot_state.RobotState._battery_set_mode">[docs]</a>  <span class="k">def</span> <span class="nf">_battery_set_mode</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Sets the battery mode to &#39;charging&#39; or &#39;discharging&#39;:\n</span>
 <span class="sd">    * &#39;charging&#39;: in this mode, the battery increases over time.\n</span>
@@ -219,7 +226,7 @@
 
     <span class="k">return</span> <span class="n">Empty</span><span class="p">()</span></div>
 
-<div class="viewcode-block" id="RobotState._simulate_battery"><a class="viewcode-back" href="../../index.html#scripts.robot_state.RobotState._simulate_battery">[docs]</a>  <span class="k">def</span> <span class="nf">_simulate_battery</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="RobotState._simulate_battery"><a class="viewcode-back" href="../../modules.html#scripts.robot_state.RobotState._simulate_battery">[docs]</a>  <span class="k">def</span> <span class="nf">_simulate_battery</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Simulates battery drain/charge over time. Both the rate and the quantity per tick can be defined by parameters:\n</span>
 <span class="sd">    * robot_state/battery_tick defines the rate of change.\n</span>
@@ -248,7 +255,7 @@
 
       <span class="n">rate</span><span class="o">.</span><span class="n">sleep</span><span class="p">()</span></div>
 
-<div class="viewcode-block" id="RobotState._publish_battery"><a class="viewcode-back" href="../../index.html#scripts.robot_state.RobotState._publish_battery">[docs]</a>  <span class="k">def</span> <span class="nf">_publish_battery</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="RobotState._publish_battery"><a class="viewcode-back" href="../../modules.html#scripts.robot_state.RobotState._publish_battery">[docs]</a>  <span class="k">def</span> <span class="nf">_publish_battery</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Publishes the current battery level to /state/battery_level at a rate defined by the /robot_state/battery_publish parameter.</span>
 <span class="sd">    &quot;&quot;&quot;</span>

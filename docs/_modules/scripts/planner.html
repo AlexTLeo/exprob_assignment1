@@ -35,8 +35,15 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">Robot Controller Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html#module-scripts.planner">Robot Planner Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html#module-scripts.behaviour">Robot Behaviour Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html#module-scripts.robot_state">Robot State Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html#module-scripts.owl_interface">OWL Ontology Interface Node</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -88,7 +95,7 @@
 
 <span class="n">LOG_TAG</span> <span class="o">=</span> <span class="s1">&#39;planner&#39;</span>
 
-<div class="viewcode-block" id="PlannerAction"><a class="viewcode-back" href="../../index.html#scripts.planner.PlannerAction">[docs]</a><span class="k">class</span> <span class="nc">PlannerAction</span><span class="p">():</span>
+<div class="viewcode-block" id="PlannerAction"><a class="viewcode-back" href="../../modules.html#scripts.planner.PlannerAction">[docs]</a><span class="k">class</span> <span class="nc">PlannerAction</span><span class="p">():</span>
   <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">  This class represents the planner and its /motion/planner action server.</span>
 <span class="sd">  &quot;&quot;&quot;</span>
@@ -109,7 +116,7 @@
     <span class="n">log_msg</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;Initialised node: planner&#39;</span><span class="p">)</span>
     <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="n">log_msg</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
 
-<div class="viewcode-block" id="PlannerAction._execute_cb"><a class="viewcode-back" href="../../index.html#scripts.planner.PlannerAction._execute_cb">[docs]</a>  <span class="k">def</span> <span class="nf">_execute_cb</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">goal</span><span class="p">):</span>
+<div class="viewcode-block" id="PlannerAction._execute_cb"><a class="viewcode-back" href="../../modules.html#scripts.planner.PlannerAction._execute_cb">[docs]</a>  <span class="k">def</span> <span class="nf">_execute_cb</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">goal</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Callback function for the Planner Action Server. In this simulation, it</span>
 <span class="sd">    simply bounces the goal back to the behaviour node, which in turn will send</span>

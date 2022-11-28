@@ -19,27 +19,14 @@ The FSM is implemented through the `ROS SMACH library <http://wiki.ros.org/smach
 while the ontology is implemented through the `ARMOR framework
 <https://github.com/EmaroLab/armor>`_.
 
-Robot Controller Node
-=======================
-.. automodule:: scripts.controller
-   :members:
+.. toctree::
+   :maxdepth: 2
+   :caption: Contents:
 
-Robot Planner Node
-=======================
-.. automodule:: scripts.planner
-  :members:
+   modules
 
-Robot Behaviour Node
-================================
-.. automodule:: scripts.behaviour
-  :members:
+Indices and tables
+==================
 
-Robot State Node
-===================
-.. automodule:: scripts.robot_state
-  :members:
-
-OWL Ontology Interface Node
-==============================
-.. automodule:: scripts.owl_interface
-  :members:
+* :ref:`genindex`
+* :ref:`modindex`
