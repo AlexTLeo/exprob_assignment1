@@ -4,7 +4,7 @@
 **Author:** ***Alex Thanaphon Leonardi*** <thanaphon.leonardi@gmail.com><br>
 
 # Assignment 1
-Full documentation here
+[Full documentation here](https://thanaphonleonardi.github.io/exprob-assignment1/)
 
 ## 1. Introduction
 This is the first assignment of the "Experimental Robotics Laboratory" course, for the Robotics Engineering degree, University of Genoa.
@@ -170,7 +170,7 @@ States are non-concurrent and updated at a rate defined by the
 
 ### Temporal/Sequence Diagram
 ![Temporal/Sequence Diagram](media/img/temporal_diagram.png)
-This diagram is kept purposefully simple. The important thing is to highlight the relationship between each node and their interactions. A detailed overview of the specific topics, services and action servers used can be read in the full documentation.
+This diagram is kept purposefully simple. The important thing is to highlight the relationship between each node and their interactions. A detailed overview of the specific topics, services and action servers used can be read in the [full documentation](https://thanaphonleonardi.github.io/exprob-assignment1/).
 
 ### Extras
 The **roslaunch** file is set by default to print to the terminal. The program is
