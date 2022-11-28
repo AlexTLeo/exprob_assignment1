@@ -4,6 +4,7 @@
 **Author:** ***Alex Thanaphon Leonardi*** <thanaphon.leonardi@gmail.com><br>
 
 # Assignment 1
+Full documentation here
 
 ## 1. Introduction
 This is the first assignment of the "Experimental Robotics Laboratory" course, for the Robotics Engineering degree, University of Genoa.
@@ -157,7 +158,9 @@ The [ROS SMACH library](http://wiki.ros.org/smach) is used to represent the FSM.
 States are non-concurrent and updated at a rate defined by the
 *STATE_UPDATE_PERIOD* global variable.
 
-### Temporal Diagram
+### Temporal/Sequence Diagram
+![Temporal/Sequence Diagram](media/img/temporal_diagram.png)
+This diagram is kept purposefully simple. The important thing is to highlight the relationship between each node and their interactions. A detailed overview of the specific topics, services and action servers used can be read in the full documentation.
 
 ### Extras
 The **roslaunch** file is set by default to print to the terminal. The program is
