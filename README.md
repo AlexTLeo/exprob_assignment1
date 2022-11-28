@@ -79,6 +79,10 @@ A location is considered a **charger** if it allows the **robot** to charge. In 
 simulation, only the **corridor E** is considered a **charger**.
 
 ### Demo Video
+![A Demonstration Video](media/img/gifs/demo.webm)<br>
+This video shows what happens when the battery goes below the *LOW* threshold.
+The planner sends the goal 'E' to the controller, which moves the robot and
+starts to charge it.
 
 ## 4. Behind The Scenes
 The simulation incorporates several elements: a Finite State Machine governs the
