@@ -80,11 +80,11 @@ simulation, only the **corridor E** is considered a **charger**.
 
 ### Demo Video
 ![A Demonstration Video](media/gifs/demo.gif)<br>
-Top left: behaviour<br>
-Top right: owl_interface<br>
-Left: planner<br>
-Right: controller<br>
-Bottom left: robot_state
+Top left: **behaviour**<br>
+Top right: **owl_interface**<br>
+Left: **planner**<br>
+Right: **controller**<br>
+Bottom left: **robot_state**
 
 This video shows what happens when the battery goes below the *LOW* threshold.
 The planner sends the goal 'E' to the controller, which moves the robot and
