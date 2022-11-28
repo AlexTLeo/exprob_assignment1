@@ -179,9 +179,9 @@ modifying the launch file accordingly.
 
 ## 5. System Analysis
 ### Assumptions
-1. The robot starts in state CHARGING and in location 'E', even though these can be
+1. The robot starts with full battery in state CHARGING and in location 'E', even though these can be
 tweaked from the ontology and from the behaviour.py script.
-2. The location 'E' is considered a possible "normal" goal for the robot.
+2. The location 'E', even though it is special as it is the charging room, is still considered a possible "normal" goal for the robot.
 3. Even if the battery reaches 0, the robot continues working. This is purposeful,
 as it allows the simulation to function even with high battery discharge rates,
 for analysis purposes.
@@ -210,4 +210,4 @@ These improvements would allow for optimal use of the robot's battery.
 #### 3. Actual "Work"
 In this simulation, no real "work" is done by the planner or the controller.
 Of course, some real task should be given to the robot, and the controller
-expanded to include such task.
+expanded to include such a task.
