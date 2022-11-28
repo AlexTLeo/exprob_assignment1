@@ -51,7 +51,7 @@ by having only *one* **door** connecting it to another location.<br>
 
 Each location is additionally characterised by a numeric data property called
 *visitedAt* that represents the last moment it has been visited by the **robot**,
-expresed in Unix time (since epoch).<br>
+expressed in Unix time (since epoch).<br>
 
 Before describing the **robot**'s behaviour, the concepts of *urgency* and
 *reachability* should be introduced:
@@ -66,13 +66,13 @@ The **robot** exhibits the following behaviour: first, it looks for the next
   2. corridors
   3. rooms
 
-Then, it goes to that location and waits for some time (to simulate work), after
+Then, it goes to that location and waits for some time (to simulate work); after
 which a new location is searched for and so on.
 
 During its entire operation, the robot constantly monitors its own battery. If
 the battery level falls below the first threshold (battery *low*), then the robot
-will finsh up its current work and then immediately after go charge itself. If
-however the battery level falls below the second threshold (battery *critical*),
+will finish up its current work and then immediately after go charge itself. If,
+however, the battery level falls below the second threshold (battery *critical*),
 then the robot will immediately stop its work and find a charging station.
 
 A location is considered a **charger** if it allows the **robot** to charge. In this
@@ -182,7 +182,7 @@ modifying the launch file accordingly.
 1. The robot starts in state CHARGING and in location 'E', even though these can be
 tweaked from the ontology and from the behaviour.py script.
 2. The location 'E' is considered a possible "normal" goal for the robot.
-3. Even if the battry reaches 0, the robot continues working. This is purposeful,
+3. Even if the battery reaches 0, the robot continues working. This is purposeful,
 as it allows the simulation to function even with high battery discharge rates,
 for analysis purposes.
 4. The FSM is non-concurrent, so the robot can only be in one state at any given time.
@@ -199,7 +199,7 @@ inevitably lead the robot to a corridor which is then adjacent to 'E'.
 However, for bigger maps and more complex movements, a path-planning algorithm
 should be implemented, such as the [A* Search Algorithm](https://en.wikipedia.org/wiki/A*_search_algorithm).
 #### 2. Complex Battery Management
-Currently, the robot is not that robust with regards to its battery management,
+Currently, the robot is not that robust with regard to its battery management,
 and the battery could run out before the robot has had the time to reach a
 charging station.
 Especially for bigger maps, the thresholds for *low* or *critical* battery levels should
@@ -208,6 +208,6 @@ some predetermined values. Also, the robot should have some sort of *low power m
 for example when it is idling.
 These improvements would allow for optimal use of the robot's battery.
 #### 3. Actual "Work"
-In this simulation, no real "work" is done by the planner nor the controller.
+In this simulation, no real "work" is done by the planner or the controller.
 Of course, some real task should be given to the robot, and the controller
 expanded to include such task.
