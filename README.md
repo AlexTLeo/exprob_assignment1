@@ -96,6 +96,12 @@ flow of events, while a component diagram describes the interactions among the
 ROS nodes involved.
 
 ### Finite State Machine
+Automatically generated image by [smach_viewer](http://wiki.ros.org/smach_viewer):
+<br>
+![State Machine diagram](media/img/exprob_ass1_smach_viewer.png)
+<br>
+Manually drawn:
+<br>
 ![The Finite State Machine of the robot](media/img/state_diagram.png)<br><br>
 The robot starts in state **CHARGING** with a battery level determined by the
 global variable *STARTING_BATTERY_LEVEL* defined in **robot_state.py**, and
