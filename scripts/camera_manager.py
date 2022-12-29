@@ -1,39 +1,17 @@
 """
-.. module::controller
+.. module::camera_manager
    :platform: Ubuntu 20.04
-   :snyopsis: This module receives a set of waypoints and physically moves
-   the robot through them.
+   :snyopsis: This module manages the camera joint and scans for surrounding
+   markers.
 
 .. moduleauthor:: Alex Thanaphon Leonardi <thanaphon.leonardi@gmail.com>
 
-This module receives a set of waypoints from the :mod:`behaviour` module (that
-in turn received it from the :mod:`planner` module) and
-physically moves the robot through them. Once the final destination is reached,
-or upon failure, the :mod:`behaviour` module is notified.
-This module also manages the robot's battery charging.
-
-In this simulated program, only adjacent locations are considered reachable,
-therefore the controller only ever has one waypoint to go towards. Therefore,
-this module simulates work by busy waiting.
-
-Publishes to:
-  **/state/set_pose** sets the pose (i.e. robot location) in the ontology.
-
-Subscribes to:
-  **/state/battery_level** gets the current battery level.
-
-ServiceProxy:
-  **/state/battery/set_mode** sets the battery to either charge or discharge.\n
-  **/owl_interface/update_visited** updates the timestamp associated to a location.
-
-Action Server:
-  **/motion/controller/move** given a set of viapoints, moves the robot through them.\n
-  **/battery/controller/charge** charges the robot.
+This module manages the camera joint and scans for surrounding
+markers.
 """
 
 import rospy
 import threading
-import actionlib
 from rospy.exceptions import ROSException
 from exprob_assignment1 import utils
 from exprob_assignment1.msg import *
@@ -65,8 +43,15 @@ class ControllerAction():
     # Helper variable used to determine if battery is full or not
     self._is_fully_charged = False
 
+    # Helper variable used to rotate hokuyo laser
+    self._hokuyo_curr_rot = 0
+
     # Publisher: /state/set_pose
     self._pub_set_pose = rospy.Publisher('/state/set_pose', Location, queue_size=10)
+
+    # Publish commands on a separate thread to /Giskard/joint_hokuyo_controller/command
+    thread_pub_hokuyo_command = threading.Thread(target=self._publish_hokuyo_command)
+    thread_pub_hokuyo_command.start()
 
     # Get current battery level from /state/battery_level
     # (runs on a separate thread)
@@ -94,6 +79,27 @@ class ControllerAction():
                                             execute_cb = self._execute_charge_cb,
                                             auto_start = False)
     self._as_charge.start()
+
+  def _publish_hokuyo_command(self):
+    """
+    Publishes commands to the /Giskard/joint_hokuyo_controller/command to rotate
+    the laser scanner by 360 degrees multiple times every second
+    """
+    # Publisher
+    pub_hokuyo_command = rospy.Publisher('/Giskard/joint_hokuyo_controller/command',
+                                      Float64, queue_size = 60, latch = True)
+    rate = rospy.Rate(4)
+
+    while not rospy.is_shutdown():
+      command = Float64()
+
+      # Rotate the hokuyo 360 degrees
+      self._hokuyo_curr_rot = (self._hokuyo_curr_rot + 1.57) % 6.28
+
+      command.data = self._hokuyo_curr_rot
+      pub_hokuyo_command.publish(command)
+      rate.sleep()
+
 
   def _execute_move_cb(self, plan):
     """

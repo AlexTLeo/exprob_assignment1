@@ -39,11 +39,11 @@ import rospy
 import threading
 import time
 import re
-from assignment1 import utils
+from exprob_assignment1 import utils
 from os.path import dirname, realpath
 from armor_api.armor_client import ArmorClient
-from assignment1.msg import Location, Battery
-from assignment1.srv import UpdateVisitedAt, GetGoal, GetPose
+from exprob_assignment1.msg import Location, Battery
+from exprob_assignment1.srv import UpdateVisitedAt, GetGoal, GetPose
 from std_msgs.msg import Empty
 
 LOG_TAG = 'owl_interface'

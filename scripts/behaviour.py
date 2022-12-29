@@ -44,9 +44,9 @@ import random
 import actionlib
 from threading import Lock
 from std_msgs.msg import Empty
-from assignment1 import utils
-from assignment1.msg import *
-from assignment1.srv import GetGoal, GetPose
+from exprob_assignment1 import utils
+from exprob_assignment1.msg import *
+from exprob_assignment1.srv import GetGoal, GetPose
 from os.path import dirname, realpath
 
 LOG_TAG = 'behaviour'

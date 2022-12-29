@@ -19,8 +19,8 @@ Action Server:
 import rospy
 import threading
 import actionlib
-from assignment1 import utils
-from assignment1.msg import Location, PlanAction, PlanFeedback, PlanResult
+from exprob_assignment1 import utils
+from exprob_assignment1.msg import Location, PlanAction, PlanFeedback, PlanResult
 
 LOG_TAG = 'planner'
 

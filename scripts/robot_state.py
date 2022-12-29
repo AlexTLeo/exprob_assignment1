@@ -36,9 +36,9 @@ Service:
 import threading
 import random
 import rospy
-from assignment1 import utils
-from assignment1.msg import Battery, Location
-from assignment1.srv import BatteryMode
+from exprob_assignment1 import utils
+from exprob_assignment1.msg import Battery, Location
+from exprob_assignment1.srv import BatteryMode
 from std_msgs.msg import Empty
 
 LOG_TAG = 'robot_state'
