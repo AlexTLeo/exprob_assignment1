@@ -4,7 +4,7 @@
 **Author:** ***Alex Thanaphon Leonardi*** <thanaphon.leonardi@gmail.com><br>
 
 # Assignment 1
-[Full documentation here](https://thanaphonleonardi.github.io/exprob-assignment1/)
+[Full documentation here](https://thanaphonleonardi.github.io/exprob_assignment1/)
 
 ## 1. Introduction
 This is the first assignment of the "Experimental Robotics Laboratory" course, for the Robotics Engineering degree, University of Genoa.
@@ -20,7 +20,7 @@ while the ontology is implemented through the [ARMOR framework](https://github.c
 ### Installation
 This simulation runs on ROS Noetic. Clone this repository into your ROS workspace's src/ folder:
 ```
-git clone https://www.github.com/ThanaphonLeonardi/exprob-assignment1
+git clone https://www.github.com/ThanaphonLeonardi/exprob_assignment1
 ```
 It also requires [ARMOR](https://github.com/EmaroLab/armor) (follow the
 [tutorial presented here](https://github.com/EmaroLab/armor/issues/7)) and the
@@ -36,7 +36,7 @@ sudo apt-get install xterm
 ### Execution
 Launch the simulation:
 ```
-roslaunch exprob-assignment1 assignment1.launch
+roslaunch exprob_assignment1 assignment1.launch
 ```
 
 ## 3. Description
@@ -176,7 +176,7 @@ States are non-concurrent and updated at a rate defined by the
 
 ### Temporal/Sequence Diagram
 ![Temporal/Sequence Diagram](media/img/temporal_diagram.png)
-This diagram is kept purposefully simple. The important thing is to highlight the relationship between each node and their interactions. A detailed overview of the specific topics, services and action servers used can be read in the [full documentation](https://thanaphonleonardi.github.io/exprob-assignment1/).
+This diagram is kept purposefully simple. The important thing is to highlight the relationship between each node and their interactions. A detailed overview of the specific topics, services and action servers used can be read in the [full documentation](https://thanaphonleonardi.github.io/exprob_assignment1/).
 
 ### Extras
 The **roslaunch** file is set by default to print to the terminal. The program is
