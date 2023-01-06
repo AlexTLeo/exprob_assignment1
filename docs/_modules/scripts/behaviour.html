@@ -115,9 +115,9 @@
 <span class="kn">import</span> <span class="nn">actionlib</span>
 <span class="kn">from</span> <span class="nn">threading</span> <span class="kn">import</span> <span class="n">Lock</span>
 <span class="kn">from</span> <span class="nn">std_msgs.msg</span> <span class="kn">import</span> <span class="n">Empty</span>
-<span class="kn">from</span> <span class="nn">assignment1</span> <span class="kn">import</span> <span class="n">utils</span>
-<span class="kn">from</span> <span class="nn">assignment1.msg</span> <span class="kn">import</span> <span class="o">*</span>
-<span class="kn">from</span> <span class="nn">assignment1.srv</span> <span class="kn">import</span> <span class="n">GetGoal</span><span class="p">,</span> <span class="n">GetPose</span>
+<span class="kn">from</span> <span class="nn">exprob_assignment1</span> <span class="kn">import</span> <span class="n">utils</span>
+<span class="kn">from</span> <span class="nn">exprob_assignment1.msg</span> <span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">exprob_assignment1.srv</span> <span class="kn">import</span> <span class="n">GetGoal</span><span class="p">,</span> <span class="n">GetPose</span>
 <span class="kn">from</span> <span class="nn">os.path</span> <span class="kn">import</span> <span class="n">dirname</span><span class="p">,</span> <span class="n">realpath</span>
 
 <span class="n">LOG_TAG</span> <span class="o">=</span> <span class="s1">&#39;behaviour&#39;</span>
@@ -131,12 +131,14 @@
 <span class="n">BATTERY_STATUS_PERIOD</span> <span class="o">=</span> <span class="mi">2</span>
 
 <span class="c1"># The list of all states</span>
+<span class="n">STATE_INIT</span> <span class="o">=</span> <span class="s1">&#39;INIT&#39;</span>
 <span class="n">STATE_CHARGING</span> <span class="o">=</span> <span class="s1">&#39;CHARGING&#39;</span>
 <span class="n">STATE_PLAN_GOAL</span> <span class="o">=</span> <span class="s1">&#39;PLAN_GOAL&#39;</span>
 <span class="n">STATE_MOVING</span> <span class="o">=</span> <span class="s1">&#39;MOVING&#39;</span>
 <span class="n">STATE_WAITING</span> <span class="o">=</span> <span class="s1">&#39;WAITING&#39;</span>
 
 <span class="c1"># The list of all transitions</span>
+<span class="n">TRANS_INIT</span> <span class="o">=</span> <span class="s1">&#39;init&#39;</span>
 <span class="n">TRANS_PLAN_GOAL</span> <span class="o">=</span> <span class="s1">&#39;plan_goal&#39;</span>
 <span class="n">TRANS_LOW_BATTERY</span> <span class="o">=</span> <span class="s1">&#39;low_battery&#39;</span>
 <span class="n">TRANS_MOVE_TO_GOAL</span> <span class="o">=</span> <span class="s1">&#39;move_to_goal&#39;</span>
@@ -148,6 +150,52 @@
 <span class="c1"># Global variable to keep track of battery status across all states</span>
 <span class="n">is_battery_low</span> <span class="o">=</span> <span class="kc">False</span>
 <span class="n">is_battery_critical</span> <span class="o">=</span> <span class="kc">False</span>
+
+<span class="c1"># state: INIT</span>
+<div class="viewcode-block" id="Init"><a class="viewcode-back" href="../../modules.html#scripts.behaviour.Init">[docs]</a><span class="k">class</span> <span class="nc">Init</span><span class="p">(</span><span class="n">smach</span><span class="o">.</span><span class="n">State</span><span class="p">):</span>
+  <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">  This class represents the INIT state of the state machine, in which the</span>
+<span class="sd">  robot scans the surrounding markers and builds the map (as an ontology).</span>
+<span class="sd">  Afterwards, the robot moves to the room E and awaits further instructions.</span>
+<span class="sd">  &quot;&quot;&quot;</span>
+  <span class="c1"># An Action Client passes the scan mode to the controller</span>
+  <span class="n">_act_client</span> <span class="o">=</span> <span class="n">actionlib</span><span class="o">.</span><span class="n">SimpleActionClient</span><span class="p">(</span><span class="s1">&#39;/motion/controller/scan&#39;</span><span class="p">,</span> <span class="n">ScanAction</span><span class="p">)</span>
+
+  <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="n">smach</span><span class="o">.</span><span class="n">State</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
+                         <span class="n">outcomes</span><span class="o">=</span><span class="p">[</span><span class="n">TRANS_LOW_BATTERY</span><span class="p">,</span>
+                                   <span class="n">TRANS_INIT</span><span class="p">])</span>
+
+<div class="viewcode-block" id="Init._scan_markers"><a class="viewcode-back" href="../../modules.html#scripts.behaviour.Init._scan_markers">[docs]</a>  <span class="k">def</span> <span class="nf">_scan_markers</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Scans the starting room for markers to build the map</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_act_client</span><span class="o">.</span><span class="n">wait_for_server</span><span class="p">()</span>
+    <span class="c1"># At the beginning, scan markers</span>
+    <span class="n">goal</span> <span class="o">=</span> <span class="n">ScanGoal</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s2">&quot;marker&quot;</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_act_client</span><span class="o">.</span><span class="n">send_goal</span><span class="p">(</span><span class="n">goal</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_act_client</span><span class="o">.</span><span class="n">wait_for_result</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_act_client</span><span class="o">.</span><span class="n">get_result</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="Init.execute"><a class="viewcode-back" href="../../modules.html#scripts.behaviour.Init.execute">[docs]</a>  <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">userdata</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Every STATE_UPDATE_PERIOD, check if the scan is complete. If so, move on to</span>
+<span class="sd">    the CHARGING state, otherwise stay here.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="s1">&#39;Scanning markers...&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scan_markers</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">success</span> <span class="ow">is</span> <span class="kc">True</span><span class="p">:</span>
+      <span class="c1"># If finish scan, go to CHARGING</span>
+      <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="s1">&#39;Scan complete, transitioning to CHARGING&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+      <span class="k">return</span> <span class="n">TRANS_LOW_BATTERY</span>
+    <span class="k">else</span><span class="p">:</span>
+      <span class="c1"># Otherwise stay here</span>
+      <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="s1">&#39;Scan incomplete.&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+      <span class="k">return</span> <span class="n">TRANS_INIT</span>
+
+    <span class="n">rospy</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">STATE_UPDATE_PERIOD</span><span class="p">)</span></div></div>
 
 <span class="c1"># state: CHARGING</span>
 <div class="viewcode-block" id="Charging"><a class="viewcode-back" href="../../modules.html#scripts.behaviour.Charging">[docs]</a><span class="k">class</span> <span class="nc">Charging</span><span class="p">(</span><span class="n">smach</span><span class="o">.</span><span class="n">State</span><span class="p">):</span>
@@ -291,6 +339,7 @@
 <span class="sd">    Request a plan for the current goal. When received, transition to the MOVING</span>
 <span class="sd">    state.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="c1"># Get next goal</span>
     <span class="n">goal</span> <span class="o">=</span> <span class="n">PlanGoal</span><span class="p">()</span>
     <span class="n">goal</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_srv_get_goal</span><span class="p">()</span>
@@ -381,12 +430,14 @@
 <div class="viewcode-block" id="Waiting"><a class="viewcode-back" href="../../modules.html#scripts.behaviour.Waiting">[docs]</a><span class="k">class</span> <span class="nc">Waiting</span><span class="p">(</span><span class="n">smach</span><span class="o">.</span><span class="n">State</span><span class="p">):</span>
   <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">  This class represents the WAITING state of the state machine, in which the robot,</span>
-<span class="sd">  having reached its goal, waits for a random amount of time before going back</span>
-<span class="sd">  to the MOVING state.</span>
+<span class="sd">  having reached its goal, scans the room.</span>
 <span class="sd">  &quot;&quot;&quot;</span>
 
   <span class="k">global</span> <span class="n">is_battery_low</span>
   <span class="k">global</span> <span class="n">is_battery_critical</span>
+
+  <span class="c1"># An Action Client passes the scan mode to the controller</span>
+  <span class="n">_act_client</span> <span class="o">=</span> <span class="n">actionlib</span><span class="o">.</span><span class="n">SimpleActionClient</span><span class="p">(</span><span class="s1">&#39;/motion/controller/scan&#39;</span><span class="p">,</span> <span class="n">ScanAction</span><span class="p">)</span>
 
   <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
     <span class="n">smach</span><span class="o">.</span><span class="n">State</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
@@ -394,52 +445,57 @@
                                    <span class="n">TRANS_LOW_BATTERY</span><span class="p">,</span>
                                    <span class="n">TRANS_GOAL_REACHED</span><span class="p">])</span>
 
-<div class="viewcode-block" id="Waiting._simulate_work"><a class="viewcode-back" href="../../modules.html#scripts.behaviour.Waiting._simulate_work">[docs]</a>  <span class="k">def</span> <span class="nf">_simulate_work</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="Waiting._scan_room"><a class="viewcode-back" href="../../modules.html#scripts.behaviour.Waiting._scan_room">[docs]</a>  <span class="k">def</span> <span class="nf">_scan_room</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Simulate work by sleeping for some seconds.</span>
-<span class="sd">    This is split up into multiple smaller waits so that it may be preempted</span>
-<span class="sd">    in case of critically low battery.</span>
+<span class="sd">    Scans the room</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">total_time</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">50</span><span class="p">,</span> <span class="mi">200</span><span class="p">)</span>
-    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">total_time</span><span class="p">):</span>
-      <span class="k">with</span> <span class="n">lock</span><span class="p">:</span>
-        <span class="n">ibc</span> <span class="o">=</span> <span class="n">is_battery_critical</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_act_client</span><span class="o">.</span><span class="n">wait_for_server</span><span class="p">()</span>
+    <span class="c1"># Scan the room</span>
+    <span class="n">goal</span> <span class="o">=</span> <span class="n">ScanGoal</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s2">&quot;room&quot;</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_act_client</span><span class="o">.</span><span class="n">send_goal</span><span class="p">(</span><span class="n">goal</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_act_client</span><span class="o">.</span><span class="n">wait_for_result</span><span class="p">()</span>
 
-      <span class="k">if</span> <span class="p">(</span><span class="n">ibc</span> <span class="o">==</span> <span class="kc">True</span><span class="p">):</span>
-        <span class="k">break</span>
-      <span class="k">else</span><span class="p">:</span>
-        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;(</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s1"> -&gt; </span><span class="si">{</span><span class="n">total_time</span><span class="si">}</span><span class="s1">) Working...&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
-        <span class="n">rospy</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span></div>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_act_client</span><span class="o">.</span><span class="n">get_result</span><span class="p">()</span></div>
 
 <div class="viewcode-block" id="Waiting.execute"><a class="viewcode-back" href="../../modules.html#scripts.behaviour.Waiting.execute">[docs]</a>  <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">userdata</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    While waiting, keep checking if the battery gets too low. If it goes below</span>
-<span class="sd">    the critical threshold, then interrupt the waiting and transition to the</span>
-<span class="sd">    CHARGING state.</span>
+<span class="sd">    If the battery goes below the critical threshold, then</span>
+<span class="sd">    transition to the CHARGING state.</span>
 
 <span class="sd">    When done waiting, transition to the PLAN_GOAL state.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">rospy</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">STATE_UPDATE_PERIOD</span><span class="p">)</span>
 
-    <span class="c1"># Check battery status</span>
+    <span class="c1"># Scan the room</span>
+    <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="s1">&#39;Scanning room...&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scan_room</span><span class="p">()</span>
+
+    <span class="c1"># Check battery</span>
     <span class="k">with</span> <span class="n">lock</span><span class="p">:</span>
       <span class="n">ibl</span> <span class="o">=</span> <span class="n">is_battery_low</span>
       <span class="n">ibc</span> <span class="o">=</span> <span class="n">is_battery_critical</span>
 
-    <span class="k">if</span> <span class="p">(</span><span class="n">ibl</span> <span class="o">==</span> <span class="kc">True</span><span class="p">):</span>
+    <span class="c1"># If scan finished...</span>
+    <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">success</span> <span class="ow">is</span> <span class="kc">True</span><span class="p">:</span>
+      <span class="k">if</span> <span class="p">(</span><span class="n">ibl</span> <span class="o">==</span> <span class="kc">True</span><span class="p">):</span>
+        <span class="c1"># If the battery is low, go to CHARGING</span>
+        <span class="k">return</span> <span class="n">TRANS_LOW_BATTERY</span>
+      <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># otherwise, go to PLAN_GOAL</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="s1">&#39;Scan complete, transitioning to PLAN_GOAL&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">TRANS_PLAN_GOAL</span>
+
+    <span class="k">else</span><span class="p">:</span>
+      <span class="c1"># If scan not finished, stay here and check battery</span>
+      <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="s1">&#39;Scan incomplete.&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+
       <span class="c1"># Is the battery level critical?</span>
       <span class="k">if</span> <span class="p">(</span><span class="n">ibc</span> <span class="o">==</span> <span class="kc">False</span><span class="p">):</span>
         <span class="c1"># If battery not critical, continue working but attempt charging immediately afterwards</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_simulate_work</span><span class="p">()</span>
-
-      <span class="c1"># Now attempt charging in this room</span>
-      <span class="k">return</span> <span class="n">TRANS_LOW_BATTERY</span>
-
-    <span class="k">else</span><span class="p">:</span>
-      <span class="c1"># If battery is good, then operate normally</span>
-      <span class="bp">self</span><span class="o">.</span><span class="n">_simulate_work</span><span class="p">()</span>
-
-    <span class="k">return</span> <span class="n">TRANS_PLAN_GOAL</span></div></div>
+        <span class="k">return</span> <span class="n">TRANS_GOAL_REACHED</span>
+      <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># If battery crtical, go to CHARGING</span>
+        <span class="k">return</span> <span class="n">TRANS_LOW_BATTERY</span></div></div>
 
 <div class="viewcode-block" id="init_state_machine"><a class="viewcode-back" href="../../modules.html#scripts.behaviour.init_state_machine">[docs]</a><span class="k">def</span> <span class="nf">init_state_machine</span><span class="p">():</span>
   <span class="sd">&quot;&quot;&quot;</span>
@@ -456,6 +512,9 @@
   <span class="c1"># Open the container</span>
   <span class="k">with</span> <span class="n">sm</span><span class="p">:</span>
     <span class="c1"># Add states to the container</span>
+    <span class="n">smach</span><span class="o">.</span><span class="n">StateMachine</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">STATE_INIT</span><span class="p">,</span> <span class="n">Init</span><span class="p">(),</span>
+                           <span class="n">transitions</span><span class="o">=</span><span class="p">{</span><span class="n">TRANS_INIT</span><span class="p">:</span><span class="n">STATE_INIT</span><span class="p">,</span>
+                                        <span class="n">TRANS_LOW_BATTERY</span><span class="p">:</span><span class="n">STATE_CHARGING</span><span class="p">})</span>
     <span class="n">smach</span><span class="o">.</span><span class="n">StateMachine</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">STATE_CHARGING</span><span class="p">,</span> <span class="n">Charging</span><span class="p">(),</span>
                            <span class="n">transitions</span><span class="o">=</span><span class="p">{</span><span class="n">TRANS_PLAN_GOAL</span><span class="p">:</span><span class="n">STATE_PLAN_GOAL</span><span class="p">,</span>
                                         <span class="n">TRANS_LOW_BATTERY</span><span class="p">:</span><span class="n">STATE_CHARGING</span><span class="p">})</span>
@@ -539,7 +598,6 @@
     <span class="n">rospy</span><span class="o">.</span><span class="n">set_param</span><span class="p">(</span><span class="s1">&#39;battery/threshold_critical&#39;</span><span class="p">,</span> <span class="mi">20</span><span class="p">)</span>
 
   <span class="c1"># Get current battery level from /state/battery_level</span>
-  <span class="c1"># (runs on a separate thread)</span>
   <span class="n">rospy</span><span class="o">.</span><span class="n">Subscriber</span><span class="p">(</span><span class="s1">&#39;state/battery_level&#39;</span><span class="p">,</span> <span class="n">Battery</span><span class="p">,</span>
         <span class="n">subscribe_battery_callback</span><span class="p">,</span> <span class="n">queue_size</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span>
 

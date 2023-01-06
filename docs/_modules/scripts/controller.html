@@ -39,7 +39,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../modules.html">Robot Controller Node</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../modules.html#module-scripts.planner">Robot Planner Node</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../modules.html#module-scripts.behaviour">Robot Behaviour Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html#robot-behaviour-node">Robot Behaviour Node</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../modules.html#module-scripts.robot_state">Robot State Node</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../modules.html#module-scripts.owl_interface">OWL Ontology Interface Node</a></li>
 </ul>
@@ -69,7 +69,9 @@
            <div itemprop="articleBody">
              
   <h1>Source code for scripts.controller</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span></span><span class="ch">#!/usr/bin/env python</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">.. module::controller</span>
 <span class="sd">   :platform: Ubuntu 20.04</span>
 <span class="sd">   :snyopsis: This module receives a set of waypoints and physically moves</span>
@@ -84,11 +86,14 @@
 <span class="sd">This module also manages the robot&#39;s battery charging.</span>
 
 <span class="sd">In this simulated program, only adjacent locations are considered reachable,</span>
-<span class="sd">therefore the controller only ever has one waypoint to go towards. Therefore,</span>
-<span class="sd">this module simulates work by busy waiting.</span>
+<span class="sd">therefore the controller only ever has one waypoint to go towards.</span>
+
+<span class="sd">The `move_base package &lt;http://wiki.ros.org/move_base&gt;`_ is used to navigate</span>
+<span class="sd">the robot, and the `gmapping package &lt;http://wiki.ros.org/gmapping&gt;`_ is used</span>
+<span class="sd">to map the surroundings.</span>
 
 <span class="sd">Publishes to:</span>
-<span class="sd">  **/state/set_pose** sets the pose (i.e. robot location) in the ontology.</span>
+<span class="sd">  **/owl_interface/set_pose** sets the pose (i.e. robot location) in the ontology.</span>
 
 <span class="sd">Subscribes to:</span>
 <span class="sd">  **/state/battery_level** gets the current battery level.</span>
@@ -98,6 +103,7 @@
 <span class="sd">  **/owl_interface/update_visited** updates the timestamp associated to a location.</span>
 
 <span class="sd">Action Server:</span>
+<span class="sd">  **/motion/controller/scan** given a scan mode, starts camera scanning\n</span>
 <span class="sd">  **/motion/controller/move** given a set of viapoints, moves the robot through them.\n</span>
 <span class="sd">  **/battery/controller/charge** charges the robot.</span>
 <span class="sd">&quot;&quot;&quot;</span>
@@ -106,10 +112,11 @@
 <span class="kn">import</span> <span class="nn">threading</span>
 <span class="kn">import</span> <span class="nn">actionlib</span>
 <span class="kn">from</span> <span class="nn">rospy.exceptions</span> <span class="kn">import</span> <span class="n">ROSException</span>
-<span class="kn">from</span> <span class="nn">assignment1</span> <span class="kn">import</span> <span class="n">utils</span>
-<span class="kn">from</span> <span class="nn">assignment1.msg</span> <span class="kn">import</span> <span class="o">*</span>
-<span class="kn">from</span> <span class="nn">assignment1.srv</span> <span class="kn">import</span> <span class="n">BatteryMode</span><span class="p">,</span> <span class="n">UpdateVisitedAt</span>
-<span class="kn">from</span> <span class="nn">std_msgs.msg</span> <span class="kn">import</span> <span class="n">Bool</span>
+<span class="kn">from</span> <span class="nn">exprob_assignment1</span> <span class="kn">import</span> <span class="n">utils</span>
+<span class="kn">from</span> <span class="nn">exprob_assignment1.msg</span> <span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">exprob_assignment1.srv</span> <span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">std_msgs.msg</span> <span class="kn">import</span> <span class="n">Bool</span><span class="p">,</span> <span class="n">Float64</span>
+<span class="kn">from</span> <span class="nn">move_base_msgs.msg</span> <span class="kn">import</span> <span class="n">MoveBaseAction</span><span class="p">,</span> <span class="n">MoveBaseGoal</span>
 
 <span class="n">LOG_TAG</span> <span class="o">=</span> <span class="s1">&#39;controller&#39;</span>
 
@@ -136,11 +143,10 @@
     <span class="c1"># Helper variable used to determine if battery is full or not</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_is_fully_charged</span> <span class="o">=</span> <span class="kc">False</span>
 
-    <span class="c1"># Publisher: /state/set_pose</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_pub_set_pose</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Publisher</span><span class="p">(</span><span class="s1">&#39;/state/set_pose&#39;</span><span class="p">,</span> <span class="n">Location</span><span class="p">,</span> <span class="n">queue_size</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+    <span class="c1"># Publisher: /owl_interface/set_pose</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_pub_set_pose</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Publisher</span><span class="p">(</span><span class="s1">&#39;/owl_interface/set_pose&#39;</span><span class="p">,</span> <span class="n">Location</span><span class="p">,</span> <span class="n">queue_size</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 
     <span class="c1"># Get current battery level from /state/battery_level</span>
-    <span class="c1"># (runs on a separate thread)</span>
     <span class="n">rospy</span><span class="o">.</span><span class="n">Subscriber</span><span class="p">(</span><span class="s1">&#39;/state/battery_level&#39;</span><span class="p">,</span> <span class="n">Battery</span><span class="p">,</span>
           <span class="bp">self</span><span class="o">.</span><span class="n">_subscribe_battery_callback</span><span class="p">,</span> <span class="n">queue_size</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span>
 
@@ -151,6 +157,17 @@
     <span class="c1"># Service: /owl_interface/update_visited</span>
     <span class="n">rospy</span><span class="o">.</span><span class="n">wait_for_service</span><span class="p">(</span><span class="s1">&#39;/owl_interface/update_visited&#39;</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_srv_update_visited</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">ServiceProxy</span><span class="p">(</span><span class="s1">&#39;/owl_interface/update_visited&#39;</span><span class="p">,</span> <span class="n">UpdateVisitedAt</span><span class="p">)</span>
+
+    <span class="c1"># Service: /camera_manager/start_scan</span>
+    <span class="n">rospy</span><span class="o">.</span><span class="n">wait_for_service</span><span class="p">(</span><span class="s1">&#39;/camera_manager/start_scan&#39;</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_srv_start_scan</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">ServiceProxy</span><span class="p">(</span><span class="s1">&#39;/camera_manager/start_scan&#39;</span><span class="p">,</span> <span class="n">StartScan</span><span class="p">)</span>
+
+    <span class="c1"># Define the SCANNING action server and start it</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_as_scan</span> <span class="o">=</span> <span class="n">actionlib</span><span class="o">.</span><span class="n">SimpleActionServer</span><span class="p">(</span><span class="s1">&#39;/motion/controller/scan&#39;</span><span class="p">,</span>
+                                            <span class="n">ScanAction</span><span class="p">,</span>
+                                            <span class="n">execute_cb</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_execute_scan_cb</span><span class="p">,</span>
+                                            <span class="n">auto_start</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_as_scan</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
 
     <span class="c1"># Define the MOVEMENT action server and start it</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_as_move</span> <span class="o">=</span> <span class="n">actionlib</span><span class="o">.</span><span class="n">SimpleActionServer</span><span class="p">(</span><span class="s1">&#39;/motion/controller/move&#39;</span><span class="p">,</span>
@@ -165,6 +182,45 @@
                                             <span class="n">execute_cb</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_execute_charge_cb</span><span class="p">,</span>
                                             <span class="n">auto_start</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_as_charge</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+
+<div class="viewcode-block" id="ControllerAction._execute_scan_cb"><a class="viewcode-back" href="../../modules.html#scripts.controller.ControllerAction._execute_scan_cb">[docs]</a>  <span class="k">def</span> <span class="nf">_execute_scan_cb</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">type</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Callback function for the /motion/controller/scan action server.\n</span>
+<span class="sd">    Based on the received request, the robot&#39;s camera will either:\n</span>
+<span class="sd">    - &quot;marker&quot;: perform four complete rotations (upper clockwise, upper</span>
+<span class="sd">      counter-clockwise, lower clockwise, lower counter-clockwise). Then,</span>
+<span class="sd">      build the ontology through the owl_interface</span>
+<span class="sd">    - &quot;room&quot;: perform one complete rotation</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">      type (ScanAction): Type of scan to perform.</span>
+
+<span class="sd">    Feedback:</span>
+<span class="sd">      ScanFeedback: This should be ignored.</span>
+
+<span class="sd">    Result:</span>
+<span class="sd">      ScanResult: std_msgs/Empty</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Define messages that are used to publish feedback and result</span>
+    <span class="n">feedback</span> <span class="o">=</span> <span class="n">ScanFeedback</span><span class="p">()</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">ScanResult</span><span class="p">()</span>
+
+    <span class="c1"># Execute action and send feedback</span>
+    <span class="c1"># Initiate scan</span>
+    <span class="k">if</span> <span class="p">(</span><span class="nb">type</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">&quot;marker&quot;</span><span class="p">):</span>
+      <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Initiating marker scan...&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+      <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_srv_start_scan</span><span class="p">(</span><span class="s2">&quot;marker&quot;</span><span class="p">)</span>
+
+    <span class="k">elif</span> <span class="p">(</span><span class="nb">type</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">&quot;room&quot;</span><span class="p">):</span>
+      <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Initiating room scan...&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+      <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_srv_start_scan</span><span class="p">(</span><span class="s2">&quot;room&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Send feedback (EMPTY)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_as_scan</span><span class="o">.</span><span class="n">publish_feedback</span><span class="p">(</span><span class="n">feedback</span><span class="p">)</span>
+
+    <span class="bp">self</span><span class="o">.</span><span class="n">_as_scan</span><span class="o">.</span><span class="n">set_succeeded</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+
+    <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="s1">&#39;Scanning complete.&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span></div>
 
 <div class="viewcode-block" id="ControllerAction._execute_move_cb"><a class="viewcode-back" href="../../modules.html#scripts.controller.ControllerAction._execute_move_cb">[docs]</a>  <span class="k">def</span> <span class="nf">_execute_move_cb</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">plan</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
@@ -186,54 +242,41 @@
 <span class="sd">    Raises:</span>
 <span class="sd">      ROSException</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="c1"># Define messages that are used to publish feedback/result</span>
+    <span class="c1"># Define messages that are used to publish feedback and result</span>
     <span class="n">feedback</span> <span class="o">=</span> <span class="n">ControlFeedback</span><span class="p">()</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">ControlResult</span><span class="p">()</span>
     <span class="n">feedback</span><span class="o">.</span><span class="n">via_points_reached</span> <span class="o">=</span> <span class="p">[]</span>
 
     <span class="c1"># Execute action and send feedback</span>
-    <span class="c1"># Note: the controller is supposed to physically move the robot. Setting</span>
-    <span class="c1"># the pose is considered a mere software operation of updating the map to</span>
-    <span class="c1"># reflect the current reality. Setting the pose does not actually change</span>
-    <span class="c1"># the robot&#39;s pose; the physical movement happens here, by the controller.</span>
-    <span class="c1"># In reality, this should take a while, but in this simulation the controller</span>
-    <span class="c1"># does not actually do any computation, so computation is simulated</span>
+    <span class="n">final_goal</span> <span class="o">=</span> <span class="n">Location</span><span class="p">()</span>
     <span class="k">for</span> <span class="n">current_goal</span> <span class="ow">in</span> <span class="n">plan</span><span class="o">.</span><span class="n">via_points</span><span class="p">:</span>
-      <span class="c1"># Simulate robot movement</span>
+      <span class="n">final_goal</span> <span class="o">=</span> <span class="n">current_goal</span>
       <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Moving robot to </span><span class="si">{</span><span class="n">current_goal</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
-      <span class="bp">self</span><span class="o">.</span><span class="n">_simulate_computation</span><span class="p">()</span>
+      <span class="c1"># Moves the robot to the goal by sending it to the move_base action server</span>
+      <span class="n">result_move_base</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_move_to_goal</span><span class="p">(</span><span class="n">current_goal</span><span class="p">)</span>
       <span class="c1"># Update the map (ontology) by publishing to the /state/set_pose topic</span>
+      <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Setting new pose to </span><span class="si">{</span><span class="n">current_goal</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
       <span class="bp">self</span><span class="o">.</span><span class="n">_pub_set_pose</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">current_goal</span><span class="p">)</span>
       <span class="c1"># Send feedback</span>
       <span class="n">feedback</span><span class="o">.</span><span class="n">via_points_reached</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">current_goal</span><span class="p">)</span>
       <span class="bp">self</span><span class="o">.</span><span class="n">_as_move</span><span class="o">.</span><span class="n">publish_feedback</span><span class="p">(</span><span class="n">feedback</span><span class="p">)</span>
 
     <span class="c1"># Check if the final goal has been reached</span>
-    <span class="n">current_location</span> <span class="o">=</span> <span class="n">Location</span><span class="p">()</span>
-    <span class="n">current_location</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s1">&#39;unknown&#39;</span>
-    <span class="k">try</span><span class="p">:</span>
-      <span class="n">rospy</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="c1"># Wait for pose to update</span>
-      <span class="n">current_location</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">wait_for_message</span><span class="p">(</span><span class="s1">&#39;/state/get_pose&#39;</span><span class="p">,</span> <span class="n">Location</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">15</span><span class="p">)</span>
-    <span class="k">except</span> <span class="n">ROSException</span><span class="p">:</span>
-      <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="s1">&#39;Failed to get the current pose&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
-
-    <span class="k">if</span> <span class="p">(</span><span class="n">current_location</span> <span class="o">==</span> <span class="n">feedback</span><span class="o">.</span><span class="n">via_points_reached</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]):</span>
-      <span class="c1"># Goal reached</span>
-      <span class="n">result</span><span class="o">.</span><span class="n">success</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="kc">True</span>
-      <span class="c1"># Update location timestamp</span>
-      <span class="bp">self</span><span class="o">.</span><span class="n">_update_location_visited</span><span class="p">(</span><span class="n">current_location</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
-      <span class="n">log_msg</span> <span class="o">=</span> <span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Controller successfully reached final goal.&#39;</span> <span class="o">+</span>
-                 <span class="sa">f</span><span class="s1">&#39; Current position: </span><span class="si">{</span><span class="n">current_location</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
-      <span class="bp">self</span><span class="o">.</span><span class="n">_as_move</span><span class="o">.</span><span class="n">set_succeeded</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
-
-    <span class="k">else</span><span class="p">:</span>
-      <span class="c1"># Failure</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">result_move_base</span><span class="p">:</span>
       <span class="n">result</span><span class="o">.</span><span class="n">success</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="kc">False</span>
       <span class="n">log_msg</span> <span class="o">=</span> <span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Controller failed to reach final goal.&#39;</span> <span class="o">+</span>
                  <span class="sa">f</span><span class="s1">&#39; Current position: </span><span class="si">{</span><span class="n">current_location</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
       <span class="bp">self</span><span class="o">.</span><span class="n">_as_move</span><span class="o">.</span><span class="n">set_aborted</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
-
-    <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="n">log_msg</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span></div>
+      <span class="n">rospy</span><span class="o">.</span><span class="n">logerr</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="s1">&#39;Failed to get the current pose&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+      <span class="c1"># Goal reached</span>
+      <span class="n">result</span><span class="o">.</span><span class="n">success</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="kc">True</span>
+      <span class="c1"># Update location timestamp</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">_update_location_visited</span><span class="p">(</span><span class="n">final_goal</span><span class="p">)</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">_as_move</span><span class="o">.</span><span class="n">set_succeeded</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+      <span class="n">log_msg</span> <span class="o">=</span> <span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Controller successfully reached final goal.&#39;</span> <span class="o">+</span>
+                 <span class="sa">f</span><span class="s1">&#39; Current position: </span><span class="si">{</span><span class="n">final_goal</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+      <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="n">log_msg</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span></div>
 
 <div class="viewcode-block" id="ControllerAction._execute_charge_cb"><a class="viewcode-back" href="../../modules.html#scripts.controller.ControllerAction._execute_charge_cb">[docs]</a>  <span class="k">def</span> <span class="nf">_execute_charge_cb</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">empty</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
@@ -255,7 +298,7 @@
 <span class="sd">    Raises:</span>
 <span class="sd">      rospy.ServiceException - indicates failure to call service.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="c1"># Define messages that are used to publish feedback/result</span>
+    <span class="c1"># Define messages that are used to publish feedback and result</span>
     <span class="n">feedback</span> <span class="o">=</span> <span class="n">ChargeFeedback</span><span class="p">()</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">ChargeResult</span><span class="p">()</span>
 
@@ -277,11 +320,27 @@
 
     <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="s1">&#39;Charging has stopped&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span></div>
 
-<div class="viewcode-block" id="ControllerAction._simulate_computation"><a class="viewcode-back" href="../../modules.html#scripts.controller.ControllerAction._simulate_computation">[docs]</a>  <span class="k">def</span> <span class="nf">_simulate_computation</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="ControllerAction._move_to_goal"><a class="viewcode-back" href="../../modules.html#scripts.controller.ControllerAction._move_to_goal">[docs]</a>  <span class="k">def</span> <span class="nf">_move_to_goal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">goal_recv</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    2 second busy waiting to simulate computation, used by :func:`_execute_move_cbs`</span>
+<span class="sd">    Calls the move_base action server to move the robot to the coordinates</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">rospy</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span></div>
+    <span class="n">client</span> <span class="o">=</span> <span class="n">actionlib</span><span class="o">.</span><span class="n">SimpleActionClient</span><span class="p">(</span><span class="s1">&#39;move_base&#39;</span><span class="p">,</span> <span class="n">MoveBaseAction</span><span class="p">)</span>
+    <span class="n">client</span><span class="o">.</span><span class="n">wait_for_server</span><span class="p">()</span>
+
+    <span class="n">goal</span> <span class="o">=</span> <span class="n">MoveBaseGoal</span><span class="p">()</span>
+    <span class="n">goal</span><span class="o">.</span><span class="n">target_pose</span><span class="o">.</span><span class="n">header</span><span class="o">.</span><span class="n">frame_id</span> <span class="o">=</span> <span class="s2">&quot;map&quot;</span>
+    <span class="n">goal</span><span class="o">.</span><span class="n">target_pose</span><span class="o">.</span><span class="n">header</span><span class="o">.</span><span class="n">stamp</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Time</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
+    <span class="n">goal</span><span class="o">.</span><span class="n">target_pose</span><span class="o">.</span><span class="n">pose</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">x</span> <span class="o">=</span> <span class="n">goal_recv</span><span class="o">.</span><span class="n">x</span>
+    <span class="n">goal</span><span class="o">.</span><span class="n">target_pose</span><span class="o">.</span><span class="n">pose</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">y</span> <span class="o">=</span> <span class="n">goal_recv</span><span class="o">.</span><span class="n">y</span>
+    <span class="n">goal</span><span class="o">.</span><span class="n">target_pose</span><span class="o">.</span><span class="n">pose</span><span class="o">.</span><span class="n">orientation</span><span class="o">.</span><span class="n">w</span> <span class="o">=</span> <span class="mf">1.0</span>
+
+    <span class="n">client</span><span class="o">.</span><span class="n">send_goal</span><span class="p">(</span><span class="n">goal</span><span class="p">)</span>
+    <span class="n">wait</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">wait_for_result</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">wait</span><span class="p">:</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">logerr</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Failed to move robot: move_base not available!&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;move_base reports completion&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">client</span><span class="o">.</span><span class="n">get_result</span><span class="p">()</span></div>
 
 <div class="viewcode-block" id="ControllerAction._battery_charge_start"><a class="viewcode-back" href="../../modules.html#scripts.controller.ControllerAction._battery_charge_start">[docs]</a>  <span class="k">def</span> <span class="nf">_battery_charge_start</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
@@ -330,8 +389,8 @@
 <span class="sd">      This function should only be used by :func:`_execute_move_cb`.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">try</span><span class="p">:</span>
-      <span class="n">loc_to_update</span> <span class="o">=</span> <span class="n">UpdateVisitedAt</span><span class="p">()</span>
-      <span class="n">loc_to_update</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">curr_loc</span>
+      <span class="n">loc_to_update</span> <span class="o">=</span> <span class="n">UpdateVisitedAtRequest</span><span class="p">()</span>
+      <span class="n">loc_to_update</span> <span class="o">=</span> <span class="n">curr_loc</span>
       <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_srv_update_visited</span><span class="p">(</span><span class="n">loc_to_update</span><span class="p">)</span>
     <span class="k">except</span> <span class="n">rospy</span><span class="o">.</span><span class="n">ServiceException</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
       <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Location time visited update failed: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span></div>

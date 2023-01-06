@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>scripts.camera_manager &mdash; exp-assignment1  documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/graphviz.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../index.html" class="icon icon-home"> exp-assignment1
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">Robot Controller Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html#module-scripts.camera_manager">Camera Manager Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html#module-scripts.planner">Robot Planner Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html#module-scripts.behaviour">Robot Behaviour Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html#module-scripts.robot_state">Robot State Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html#module-scripts.owl_interface">OWL Ontology Interface Node</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">exp-assignment1</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+      <li>scripts.camera_manager</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for scripts.camera_manager</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">.. module::camera_manager</span>
+<span class="sd">   :platform: Ubuntu 20.04</span>
+<span class="sd">   :snyopsis: This module manages the camera joint and scans for surrounding</span>
+<span class="sd">   markers.</span>
+
+<span class="sd">.. moduleauthor:: Alex Thanaphon Leonardi &lt;thanaphon.leonardi@gmail.com&gt;</span>
+
+<span class="sd">This module manages the camera joint and scans for surrounding</span>
+<span class="sd">markers. The camera can either scan the room for markers, &quot;marker&quot; mode, or scan</span>
+<span class="sd">a room normally doing a full rotation, &quot;room&quot; mode.</span>
+
+<span class="sd">Publises to:</span>
+<span class="sd">  **/Giskard/joint_camera_controller/command**: publishes commands to the camera z-axis rotational joint.\n</span>
+<span class="sd">  **/Giskard/joint_camera_vertical_controller/command**: publishes commands to the camera z-axis prismatic joint.</span>
+
+<span class="sd">Subscribes to:</span>
+<span class="sd">  **/marker_publisher/marker_id**: gets all marker IDs when in &quot;marker&quot; scan mode.</span>
+
+<span class="sd">Service:</span>
+<span class="sd">  **/camera_manager/start_scan**: given a scan mode, starts scanning.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">rospy</span>
+<span class="kn">import</span> <span class="nn">threading</span>
+<span class="kn">from</span> <span class="nn">exprob_assignment1</span> <span class="kn">import</span> <span class="n">utils</span>
+<span class="kn">from</span> <span class="nn">exprob_assignment1.msg</span> <span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">exprob_assignment1.srv</span> <span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">assignment2.srv</span> <span class="kn">import</span> <span class="n">RoomInformation</span>
+<span class="kn">from</span> <span class="nn">std_msgs.msg</span> <span class="kn">import</span> <span class="n">Float64</span><span class="p">,</span> <span class="n">Int32</span>
+
+<span class="n">LOG_TAG</span> <span class="o">=</span> <span class="s1">&#39;camera_manager&#39;</span>
+<span class="n">lock</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Lock</span><span class="p">()</span>
+
+<div class="viewcode-block" id="CameraManager"><a class="viewcode-back" href="../../modules.html#scripts.camera_manager.CameraManager">[docs]</a><span class="k">class</span> <span class="nc">CameraManager</span><span class="p">():</span>
+  <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">  Class representing the camera manager.</span>
+<span class="sd">  &quot;&quot;&quot;</span>
+
+  <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Initialises the node, sets some helper variables, and starts the service to</span>
+<span class="sd">    receive scan requests.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">rospy</span><span class="o">.</span><span class="n">init_node</span><span class="p">(</span><span class="s1">&#39;camera_manager&#39;</span><span class="p">,</span> <span class="n">anonymous</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="n">log_msg</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;Initialised node: camera_manager&#39;</span><span class="p">)</span>
+    <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="n">log_msg</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+
+    <span class="c1"># Helper variables</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_camera_curr_rot</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_detected_marker_ids</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span> <span class="c1"># sets are fastest for lookup</span>
+
+    <span class="c1"># Service: /camera_manager/start_scan</span>
+    <span class="n">rospy</span><span class="o">.</span><span class="n">Service</span><span class="p">(</span><span class="s1">&#39;/camera_manager/start_scan&#39;</span><span class="p">,</span> <span class="n">StartScan</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_service_start_scan</span><span class="p">)</span>
+
+<div class="viewcode-block" id="CameraManager._service_start_scan"><a class="viewcode-back" href="../../modules.html#scripts.camera_manager.CameraManager._service_start_scan">[docs]</a>  <span class="k">def</span> <span class="nf">_service_start_scan</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">type</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Starts the scan, based on requested type (either &quot;marker&quot; or &quot;room&quot;)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">scan_type</span> <span class="o">=</span> <span class="nb">type</span><span class="o">.</span><span class="n">type</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_camera_curr_rot</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="c1"># Build the ontology once the marker scanning is complete</span>
+    <span class="n">thread_build_ontology</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Thread</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_build_ontology</span><span class="p">)</span>
+
+    <span class="c1"># Get all marker IDs and store them in an array by subscribing to</span>
+    <span class="c1"># /marker_publisher/marker_id</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_sub_marker_id</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Subscriber</span><span class="p">(</span><span class="s1">&#39;/marker_publisher/marker_id&#39;</span><span class="p">,</span> <span class="n">Int32</span><span class="p">,</span>
+                                          <span class="bp">self</span><span class="o">.</span><span class="n">_subscribe_marker_id_callback</span><span class="p">,</span>
+                                          <span class="n">queue_size</span> <span class="o">=</span> <span class="mi">100</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">scan_type</span> <span class="o">==</span> <span class="s2">&quot;marker&quot;</span><span class="p">):</span>
+      <span class="c1"># Four full rotations: clockwise up, counter-clockwise up, clockwise down,</span>
+      <span class="c1"># counter-clockwise down</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">_publish_marker_scan</span><span class="p">(</span><span class="n">thread_build_ontology</span><span class="p">)</span>
+
+    <span class="k">elif</span> <span class="p">(</span><span class="n">scan_type</span> <span class="o">==</span> <span class="s2">&quot;room&quot;</span><span class="p">):</span>
+      <span class="c1"># One single full rotation</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">_publish_room_scan</span><span class="p">(</span><span class="n">thread_build_ontology</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="kc">True</span></div>
+
+<div class="viewcode-block" id="CameraManager._publish_marker_scan"><a class="viewcode-back" href="../../modules.html#scripts.camera_manager.CameraManager._publish_marker_scan">[docs]</a>  <span class="k">def</span> <span class="nf">_publish_marker_scan</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">thread_build_ontology</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Publishes commands to the /Giskard/joint_camera_controller/command topic and</span>
+<span class="sd">    also to the /Giskard/joint_camera_vertical_controller/command topic</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Publisher</span>
+    <span class="n">pub_camera_command</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Publisher</span><span class="p">(</span><span class="s1">&#39;/Giskard/joint_camera_controller/command&#39;</span><span class="p">,</span>
+                                      <span class="n">Float64</span><span class="p">,</span> <span class="n">queue_size</span> <span class="o">=</span> <span class="mi">60</span><span class="p">,</span> <span class="n">latch</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span>
+    <span class="n">pub_camera_vertical_command</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Publisher</span><span class="p">(</span><span class="s1">&#39;/Giskard/joint_camera_vertical_controller/command&#39;</span><span class="p">,</span>
+                                      <span class="n">Float64</span><span class="p">,</span> <span class="n">queue_size</span> <span class="o">=</span> <span class="mi">60</span><span class="p">,</span> <span class="n">latch</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span>
+    <span class="n">rate</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Rate</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+
+    <span class="c1"># Total number of full rotations</span>
+    <span class="n">num_rot</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+
+    <span class="c1"># Raise camera up</span>
+    <span class="n">command_prismatic</span> <span class="o">=</span> <span class="mf">1.5</span>
+    <span class="n">pub_camera_vertical_command</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">command_prismatic</span><span class="p">)</span>
+
+    <span class="k">while</span> <span class="ow">not</span> <span class="n">rospy</span><span class="o">.</span><span class="n">is_shutdown</span><span class="p">():</span>
+      <span class="n">command</span> <span class="o">=</span> <span class="n">Float64</span><span class="p">()</span>
+      <span class="n">command_prismatic</span> <span class="o">=</span> <span class="n">Float64</span><span class="p">()</span>
+      <span class="n">rot_step</span> <span class="o">=</span> <span class="mf">0.19625</span><span class="o">*</span><span class="mi">4</span>
+
+      <span class="c1"># Rotate the camera 360 degrees</span>
+      <span class="k">if</span> <span class="p">(</span><span class="n">num_rot</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">0</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_camera_curr_rot</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_camera_curr_rot</span> <span class="o">-</span> <span class="n">rot_step</span>
+      <span class="k">else</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_camera_curr_rot</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_camera_curr_rot</span> <span class="o">+</span> <span class="n">rot_step</span>
+
+      <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_camera_curr_rot</span><span class="p">)</span> <span class="o">&gt;</span> <span class="p">(</span><span class="mf">6.28</span> <span class="o">+</span> <span class="n">rot_step</span><span class="p">):</span>
+        <span class="c1"># Full rotation completed (plus a margin for extra rotation)</span>
+        <span class="n">num_rot</span> <span class="o">+=</span> <span class="mi">1</span><span class="p">;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_camera_curr_rot</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="n">command</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_camera_curr_rot</span>
+        <span class="n">pub_camera_command</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">command</span><span class="p">)</span>
+
+        <span class="c1"># If first rotation complete, lower the camera</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">num_rot</span> <span class="o">==</span> <span class="mi">1</span><span class="p">):</span>
+          <span class="n">command_prismatic</span> <span class="o">=</span> <span class="mf">0.5</span>
+          <span class="n">pub_camera_vertical_command</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">command_prismatic</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="p">(</span><span class="n">num_rot</span> <span class="o">==</span> <span class="mi">2</span><span class="p">):</span>
+          <span class="c1"># Second rotation is final so reset and stop the joints</span>
+          <span class="n">command_prismatic</span> <span class="o">=</span> <span class="mi">0</span>
+          <span class="n">pub_camera_vertical_command</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">command_prismatic</span><span class="p">)</span>
+          <span class="c1"># Start the ontology building after a short wait to sync</span>
+          <span class="n">rospy</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+          <span class="n">thread_build_ontology</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+          <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Marker scanning complete.&quot;</span>
+                                       <span class="s2">&quot;Ontology building initiated.&quot;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+          <span class="k">return</span>
+      <span class="k">else</span><span class="p">:</span>
+        <span class="n">command</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_camera_curr_rot</span>
+        <span class="n">pub_camera_command</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">command</span><span class="p">)</span>
+
+      <span class="n">rate</span><span class="o">.</span><span class="n">sleep</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="CameraManager._publish_room_scan"><a class="viewcode-back" href="../../modules.html#scripts.camera_manager.CameraManager._publish_room_scan">[docs]</a>  <span class="k">def</span> <span class="nf">_publish_room_scan</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">thread_build_ontology</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Publishes commands to the /Giskard/joint_camera_controller/command topic and</span>
+<span class="sd">    also to the /Giskard/joint_camera_vertical_controller/command topic.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Publisher</span>
+    <span class="n">pub_camera_command</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Publisher</span><span class="p">(</span><span class="s1">&#39;/Giskard/joint_camera_controller/command&#39;</span><span class="p">,</span>
+                                      <span class="n">Float64</span><span class="p">,</span> <span class="n">queue_size</span> <span class="o">=</span> <span class="mi">60</span><span class="p">,</span> <span class="n">latch</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span>
+    <span class="n">pub_camera_vertical_command</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Publisher</span><span class="p">(</span><span class="s1">&#39;/Giskard/joint_camera_vertical_controller/command&#39;</span><span class="p">,</span>
+                                      <span class="n">Float64</span><span class="p">,</span> <span class="n">queue_size</span> <span class="o">=</span> <span class="mi">60</span><span class="p">,</span> <span class="n">latch</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span>
+    <span class="n">rate</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Rate</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+
+    <span class="c1"># Raise camera up</span>
+    <span class="n">command_prismatic</span> <span class="o">=</span> <span class="mf">0.5</span>
+    <span class="n">pub_camera_vertical_command</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">command_prismatic</span><span class="p">)</span>
+
+    <span class="k">while</span> <span class="ow">not</span> <span class="n">rospy</span><span class="o">.</span><span class="n">is_shutdown</span><span class="p">():</span>
+      <span class="n">command</span> <span class="o">=</span> <span class="n">Float64</span><span class="p">()</span>
+      <span class="n">rot_step</span> <span class="o">=</span> <span class="mf">0.19625</span><span class="o">*</span><span class="mi">2</span>
+
+      <span class="c1"># Rotate the camera 360 degrees</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">_camera_curr_rot</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_camera_curr_rot</span> <span class="o">+</span> <span class="n">rot_step</span>
+
+      <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_camera_curr_rot</span><span class="p">)</span> <span class="o">&gt;</span> <span class="p">(</span><span class="mf">6.28</span> <span class="o">+</span> <span class="n">rot_step</span><span class="p">):</span>
+        <span class="c1"># Full rotation completed (plus a margin for extra rotation)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_camera_curr_rot</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="n">command</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_camera_curr_rot</span>
+        <span class="n">pub_camera_command</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">command</span><span class="p">)</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Room scanning complete.&quot;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+
+        <span class="c1"># Lower camera</span>
+        <span class="n">command_prismatic</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="n">pub_camera_vertical_command</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">command_prismatic</span><span class="p">)</span>
+
+        <span class="k">return</span>
+      <span class="k">else</span><span class="p">:</span>
+        <span class="n">command</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_camera_curr_rot</span>
+        <span class="n">pub_camera_command</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">command</span><span class="p">)</span>
+
+      <span class="n">rate</span><span class="o">.</span><span class="n">sleep</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="CameraManager._subscribe_marker_id_callback"><a class="viewcode-back" href="../../modules.html#scripts.camera_manager.CameraManager._subscribe_marker_id_callback">[docs]</a>  <span class="k">def</span> <span class="nf">_subscribe_marker_id_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Subscribes to /marker_publisher/marker_id and gets the detected marker IDs,</span>
+<span class="sd">    which are added to an array which will contain all detected IDs.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">      data (Int32): the marker ID</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">marker_id</span> <span class="o">=</span> <span class="n">Int32</span><span class="p">()</span>
+    <span class="n">marker_id</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">data</span>
+
+    <span class="c1"># Python set will automatically avoid duplicates</span>
+    <span class="k">with</span> <span class="n">lock</span><span class="p">:</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">_detected_marker_ids</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">marker_id</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="CameraManager._build_ontology"><a class="viewcode-back" href="../../modules.html#scripts.camera_manager.CameraManager._build_ontology">[docs]</a>  <span class="k">def</span> <span class="nf">_build_ontology</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Sends the detected marker IDs to the marker server, gets the corresponding</span>
+<span class="sd">    information and builds the ontology by interfacing with the owl_interface</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">rospy</span><span class="o">.</span><span class="n">wait_for_service</span><span class="p">(</span><span class="s1">&#39;/room_info&#39;</span><span class="p">)</span>
+    <span class="n">service_get_room_info</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">ServiceProxy</span><span class="p">(</span><span class="s1">&#39;/room_info&#39;</span><span class="p">,</span> <span class="n">RoomInformation</span><span class="p">)</span>
+    <span class="n">rospy</span><span class="o">.</span><span class="n">wait_for_service</span><span class="p">(</span><span class="s1">&#39;/owl_interface/add_room&#39;</span><span class="p">)</span>
+    <span class="n">service_add_room</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">ServiceProxy</span><span class="p">(</span><span class="s1">&#39;/owl_interface/add_room&#39;</span><span class="p">,</span> <span class="n">AddRoom</span><span class="p">)</span>
+
+    <span class="k">with</span> <span class="n">lock</span><span class="p">:</span>
+      <span class="n">detected_marker_ids</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_detected_marker_ids</span>
+
+    <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;detected marker ids: </span><span class="si">{</span><span class="n">detected_marker_ids</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+    <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="s2">&quot;Sending room information to owl_interface&quot;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+
+    <span class="k">for</span> <span class="nb">id</span> <span class="ow">in</span> <span class="n">detected_marker_ids</span><span class="p">:</span>
+      <span class="n">room_info</span> <span class="o">=</span> <span class="n">AddRoomRequest</span><span class="p">()</span>
+
+      <span class="n">ret</span> <span class="o">=</span> <span class="n">service_get_room_info</span><span class="p">(</span><span class="nb">id</span><span class="p">)</span>
+
+      <span class="c1"># If response is invalid, skip this ID</span>
+      <span class="k">if</span> <span class="n">ret</span><span class="o">.</span><span class="n">room</span> <span class="o">==</span> <span class="s2">&quot;no room associated with this marker id&quot;</span><span class="p">:</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Invalid ID detected (</span><span class="si">{</span><span class="nb">id</span><span class="si">}</span><span class="s1">), skipping&#39;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span>
+        <span class="k">continue</span>
+
+      <span class="n">room_info</span><span class="o">.</span><span class="n">room</span> <span class="o">=</span> <span class="n">ret</span><span class="o">.</span><span class="n">room</span>
+      <span class="n">room_info</span><span class="o">.</span><span class="n">x</span> <span class="o">=</span> <span class="n">ret</span><span class="o">.</span><span class="n">x</span>
+      <span class="n">room_info</span><span class="o">.</span><span class="n">y</span> <span class="o">=</span> <span class="n">ret</span><span class="o">.</span><span class="n">y</span>
+      <span class="n">room_info</span><span class="o">.</span><span class="n">connections</span> <span class="o">=</span> <span class="n">ret</span><span class="o">.</span><span class="n">connections</span>
+
+      <span class="n">service_add_room</span><span class="p">(</span><span class="n">room_info</span><span class="p">)</span>
+
+      <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">tag_log</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Request sent for </span><span class="si">{</span><span class="n">room_info</span><span class="o">.</span><span class="n">room</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">LOG_TAG</span><span class="p">))</span></div></div>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">CameraManager</span><span class="p">()</span>
+    <span class="n">rospy</span><span class="o">.</span><span class="n">spin</span><span class="p">()</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2022, Alex Thanaphon Leonardi.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
