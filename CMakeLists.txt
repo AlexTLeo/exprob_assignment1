@@ -14,6 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
   rospy
   std_msgs
+  assignment2
 )
 
 ## System dependencies are found with CMake's conventions
@@ -63,6 +64,8 @@ add_service_files(
   UpdateVisitedAt.srv
   GetGoal.srv
   GetPose.srv
+  AddRoom.srv
+  StartScan.srv
 )
 
 # Generate actions in the 'action' folder
@@ -73,6 +76,7 @@ add_action_files(
   Plan.action
   Control.action
   Charge.action
+  Scan.action
 )
 
 # Generate added messages and services with any dependencies listed here
@@ -80,6 +84,7 @@ generate_messages(
   DEPENDENCIES
   std_msgs
   actionlib_msgs
+  assignment2
 )
 
 ################################################
@@ -175,6 +180,7 @@ catkin_install_python(PROGRAMS
   scripts/planner.py
   scripts/robot_state.py
   scripts/owl_interface.py
+  scripts/camera_manager.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

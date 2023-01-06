@@ -1,9 +1,12 @@
-
-
 Robot Controller Node
 =======================
 .. automodule:: scripts.controller
-   :members:
+ :members:
+
+Camera Manager Node
+=======================
+.. automodule:: scripts.camera_manager
+  :members:
 
 Robot Planner Node
 =======================

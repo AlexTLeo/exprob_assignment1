@@ -1,0 +1,5 @@
+string room
+float32 x
+float32 y
+assignment2/RoomConnection[] connections
+---

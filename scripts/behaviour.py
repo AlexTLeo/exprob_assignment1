@@ -60,12 +60,14 @@ STATE_UPDATE_PERIOD = 1 # s
 BATTERY_STATUS_PERIOD = 2
 
 # The list of all states
+STATE_INIT = 'INIT'
 STATE_CHARGING = 'CHARGING'
 STATE_PLAN_GOAL = 'PLAN_GOAL'
 STATE_MOVING = 'MOVING'
 STATE_WAITING = 'WAITING'
 
 # The list of all transitions
+TRANS_INIT = 'init'
 TRANS_PLAN_GOAL = 'plan_goal'
 TRANS_LOW_BATTERY = 'low_battery'
 TRANS_MOVE_TO_GOAL = 'move_to_goal'
@@ -77,6 +79,52 @@ VAR_PLAN_TO_GOAL = 'plan_to_goal'
 # Global variable to keep track of battery status across all states
 is_battery_low = False
 is_battery_critical = False
+
+# state: INIT
+class Init(smach.State):
+  """
+  This class represents the INIT state of the state machine, in which the
+  robot scans the surrounding markers and builds the map (as an ontology).
+  Afterwards, the robot moves to the room E and awaits further instructions.
+  """
+  # An Action Client passes the scan mode to the controller
+  _act_client = actionlib.SimpleActionClient('/motion/controller/scan', ScanAction)
+
+  def __init__(self):
+    smach.State.__init__(self,
+                         outcomes=[TRANS_LOW_BATTERY,
+                                   TRANS_INIT])
+
+  def _scan_markers(self):
+    """
+    Scans the starting room for markers to build the map
+    """
+    self._act_client.wait_for_server()
+    # At the beginning, scan markers
+    goal = ScanGoal(type="marker")
+    self._act_client.send_goal(goal)
+    self._act_client.wait_for_result()
+
+    return self._act_client.get_result()
+
+  def execute(self, userdata):
+    """
+    Every STATE_UPDATE_PERIOD, check if the scan is complete. If so, move on to
+    the CHARGING state, otherwise stay here.
+    """
+    rospy.loginfo(utils.tag_log('Scanning markers...', LOG_TAG))
+    result = self._scan_markers()
+
+    if result.success is True:
+      # If finish scan, go to CHARGING
+      rospy.loginfo(utils.tag_log('Scan complete, transitioning to CHARGING', LOG_TAG))
+      return TRANS_LOW_BATTERY
+    else:
+      # Otherwise stay here
+      rospy.loginfo(utils.tag_log('Scan incomplete.', LOG_TAG))
+      return TRANS_INIT
+
+    rospy.sleep(STATE_UPDATE_PERIOD)
 
 # state: CHARGING
 class Charging(smach.State):
@@ -220,6 +268,7 @@ class PlanGoal(smach.State):
     Request a plan for the current goal. When received, transition to the MOVING
     state.
     """
+
     # Get next goal
     goal = PlanGoal()
     goal = self._srv_get_goal()
@@ -310,12 +359,14 @@ class Moving(smach.State):
 class Waiting(smach.State):
   """
   This class represents the WAITING state of the state machine, in which the robot,
-  having reached its goal, waits for a random amount of time before going back
-  to the MOVING state.
+  having reached its goal, scans the room.
   """
 
   global is_battery_low
   global is_battery_critical
+
+  # An Action Client passes the scan mode to the controller
+  _act_client = actionlib.SimpleActionClient('/motion/controller/scan', ScanAction)
 
   def __init__(self):
     smach.State.__init__(self,
@@ -323,52 +374,57 @@ class Waiting(smach.State):
                                    TRANS_LOW_BATTERY,
                                    TRANS_GOAL_REACHED])
 
-  def _simulate_work(self):
+  def _scan_room(self):
     """
-    Simulate work by sleeping for some seconds.
-    This is split up into multiple smaller waits so that it may be preempted
-    in case of critically low battery.
+    Scans the room
     """
-    total_time = random.randint(50, 200)
-    for i in range(total_time):
-      with lock:
-        ibc = is_battery_critical
+    self._act_client.wait_for_server()
+    # Scan the room
+    goal = ScanGoal(type="room")
+    self._act_client.send_goal(goal)
+    self._act_client.wait_for_result()
 
-      if (ibc == True):
-        break
-      else:
-        rospy.loginfo(utils.tag_log(f'({i} -> {total_time}) Working...', LOG_TAG))
-        rospy.sleep(1)
+    return self._act_client.get_result()
 
   def execute(self, userdata):
     """
-    While waiting, keep checking if the battery gets too low. If it goes below
-    the critical threshold, then interrupt the waiting and transition to the
-    CHARGING state.
+    If the battery goes below the critical threshold, then
+    transition to the CHARGING state.
 
     When done waiting, transition to the PLAN_GOAL state.
     """
     rospy.sleep(STATE_UPDATE_PERIOD)
 
-    # Check battery status
+    # Scan the room
+    rospy.loginfo(utils.tag_log('Scanning room...', LOG_TAG))
+    result = self._scan_room()
+
+    # Check battery
     with lock:
       ibl = is_battery_low
       ibc = is_battery_critical
 
-    if (ibl == True):
+    # If scan finished...
+    if result.success is True:
+      if (ibl == True):
+        # If the battery is low, go to CHARGING
+        return TRANS_LOW_BATTERY
+      else:
+        # otherwise, go to PLAN_GOAL
+        rospy.loginfo(utils.tag_log('Scan complete, transitioning to PLAN_GOAL', LOG_TAG))
+        return TRANS_PLAN_GOAL
+
+    else:
+      # If scan not finished, stay here and check battery
+      rospy.loginfo(utils.tag_log('Scan incomplete.', LOG_TAG))
+
       # Is the battery level critical?
       if (ibc == False):
         # If battery not critical, continue working but attempt charging immediately afterwards
-        self._simulate_work()
-
-      # Now attempt charging in this room
-      return TRANS_LOW_BATTERY
-
-    else:
-      # If battery is good, then operate normally
-      self._simulate_work()
-
-    return TRANS_PLAN_GOAL
+        return TRANS_GOAL_REACHED
+      else:
+        # If battery crtical, go to CHARGING
+        return TRANS_LOW_BATTERY
 
 def init_state_machine():
   """
@@ -385,6 +441,9 @@ def init_state_machine():
   # Open the container
   with sm:
     # Add states to the container
+    smach.StateMachine.add(STATE_INIT, Init(),
+                           transitions={TRANS_INIT:STATE_INIT,
+                                        TRANS_LOW_BATTERY:STATE_CHARGING})
     smach.StateMachine.add(STATE_CHARGING, Charging(),
                            transitions={TRANS_PLAN_GOAL:STATE_PLAN_GOAL,
                                         TRANS_LOW_BATTERY:STATE_CHARGING})
@@ -468,7 +527,6 @@ def main():
     rospy.set_param('battery/threshold_critical', 20)
 
   # Get current battery level from /state/battery_level
-  # (runs on a separate thread)
   rospy.Subscriber('state/battery_level', Battery,
         subscribe_battery_callback, queue_size = 1)
 

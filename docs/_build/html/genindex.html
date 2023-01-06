@@ -38,6 +38,7 @@
               <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="modules.html">Robot Controller Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules.html#module-scripts.camera_manager">Camera Manager Node</a></li>
 <li class="toctree-l1"><a class="reference internal" href="modules.html#module-scripts.planner">Robot Planner Node</a></li>
 <li class="toctree-l1"><a class="reference internal" href="modules.html#module-scripts.behaviour">Robot Behaviour Node</a></li>
 <li class="toctree-l1"><a class="reference internal" href="modules.html#module-scripts.robot_state">Robot State Node</a></li>
@@ -94,6 +95,8 @@
 </li>
       <li><a href="modules.html#scripts.robot_state.RobotState._battery_set_mode">_battery_set_mode() (scripts.robot_state.RobotState method)</a>
 </li>
+      <li><a href="modules.html#scripts.camera_manager.CameraManager._build_ontology">_build_ontology() (scripts.camera_manager.CameraManager method)</a>
+</li>
       <li><a href="modules.html#scripts.behaviour.Charging._charge_battery">_charge_battery() (scripts.behaviour.Charging method)</a>
 </li>
       <li><a href="modules.html#scripts.planner.PlannerAction._execute_cb">_execute_cb() (scripts.planner.PlannerAction method)</a>
@@ -102,29 +105,39 @@
 </li>
       <li><a href="modules.html#scripts.controller.ControllerAction._execute_move_cb">_execute_move_cb() (scripts.controller.ControllerAction method)</a>
 </li>
+      <li><a href="modules.html#scripts.controller.ControllerAction._execute_scan_cb">_execute_scan_cb() (scripts.controller.ControllerAction method)</a>
+</li>
+      <li><a href="modules.html#scripts.owl_interface.OwlInterface._infer_room_type">_infer_room_type() (scripts.owl_interface.OwlInterface method)</a>
+</li>
       <li><a href="modules.html#scripts.owl_interface.OwlInterface._init_armor_client">_init_armor_client() (scripts.owl_interface.OwlInterface method)</a>
+</li>
+      <li><a href="modules.html#scripts.controller.ControllerAction._move_to_goal">_move_to_goal() (scripts.controller.ControllerAction method)</a>
 </li>
       <li><a href="modules.html#scripts.robot_state.RobotState._publish_battery">_publish_battery() (scripts.robot_state.RobotState method)</a>
 </li>
-      <li><a href="modules.html#scripts.owl_interface.OwlInterface._publish_goal">_publish_goal() (scripts.owl_interface.OwlInterface method)</a>
+      <li><a href="modules.html#scripts.camera_manager.CameraManager._publish_marker_scan">_publish_marker_scan() (scripts.camera_manager.CameraManager method)</a>
 </li>
       <li><a href="modules.html#scripts.owl_interface.OwlInterface._publish_pose">_publish_pose() (scripts.owl_interface.OwlInterface method)</a>
 </li>
-      <li><a href="modules.html#scripts.behaviour.PlanGoal._request_plan">_request_plan() (scripts.behaviour.PlanGoal method)</a>
-</li>
-      <li><a href="modules.html#scripts.owl_interface.OwlInterface._search_next_goal">_search_next_goal() (scripts.owl_interface.OwlInterface method)</a>
+      <li><a href="modules.html#scripts.camera_manager.CameraManager._publish_room_scan">_publish_room_scan() (scripts.camera_manager.CameraManager method)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules.html#scripts.behaviour.PlanGoal._request_plan">_request_plan() (scripts.behaviour.PlanGoal method)</a>
+</li>
+      <li><a href="modules.html#scripts.behaviour.Init._scan_markers">_scan_markers() (scripts.behaviour.Init method)</a>
+</li>
+      <li><a href="modules.html#scripts.behaviour.Waiting._scan_room">_scan_room() (scripts.behaviour.Waiting method)</a>
+</li>
+      <li><a href="modules.html#scripts.owl_interface.OwlInterface._service_add_room">_service_add_room() (scripts.owl_interface.OwlInterface method)</a>
+</li>
       <li><a href="modules.html#scripts.owl_interface.OwlInterface._service_get_goal">_service_get_goal() (scripts.owl_interface.OwlInterface method)</a>
 </li>
       <li><a href="modules.html#scripts.owl_interface.OwlInterface._service_get_pose">_service_get_pose() (scripts.owl_interface.OwlInterface method)</a>
 </li>
+      <li><a href="modules.html#scripts.camera_manager.CameraManager._service_start_scan">_service_start_scan() (scripts.camera_manager.CameraManager method)</a>
+</li>
       <li><a href="modules.html#scripts.robot_state.RobotState._simulate_battery">_simulate_battery() (scripts.robot_state.RobotState method)</a>
-</li>
-      <li><a href="modules.html#scripts.controller.ControllerAction._simulate_computation">_simulate_computation() (scripts.controller.ControllerAction method)</a>
-</li>
-      <li><a href="modules.html#scripts.behaviour.Waiting._simulate_work">_simulate_work() (scripts.behaviour.Waiting method)</a>
 </li>
       <li><a href="modules.html#scripts.behaviour.PlanGoal._srv_get_goal">_srv_get_goal() (scripts.behaviour.PlanGoal method)</a>
 </li>
@@ -134,14 +147,10 @@
 </li>
       <li><a href="modules.html#scripts.robot_state.RobotState._subscribe_get_pose_callback">_subscribe_get_pose_callback() (scripts.robot_state.RobotState method)</a>
 </li>
-      <li><a href="modules.html#scripts.robot_state.RobotState._subscribe_goal_callback">_subscribe_goal_callback() (scripts.robot_state.RobotState method)</a>
+      <li><a href="modules.html#scripts.camera_manager.CameraManager._subscribe_marker_id_callback">_subscribe_marker_id_callback() (scripts.camera_manager.CameraManager method)</a>
 </li>
       <li><a href="modules.html#scripts.owl_interface.OwlInterface._subscribe_set_pose_callback">_subscribe_set_pose_callback() (scripts.owl_interface.OwlInterface method)</a>
-
-      <ul>
-        <li><a href="modules.html#scripts.robot_state.RobotState._subscribe_set_pose_callback">(scripts.robot_state.RobotState method)</a>
 </li>
-      </ul></li>
       <li><a href="modules.html#scripts.controller.ControllerAction._update_location_visited">_update_location_visited() (scripts.controller.ControllerAction method)</a>
 </li>
       <li><a href="modules.html#scripts.owl_interface.OwlInterface._update_robot_time">_update_robot_time() (scripts.owl_interface.OwlInterface method)</a>
@@ -154,10 +163,12 @@
 <h2 id="C">C</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="modules.html#scripts.behaviour.Charging">Charging (class in scripts.behaviour)</a>
+      <li><a href="modules.html#scripts.camera_manager.CameraManager">CameraManager (class in scripts.camera_manager)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules.html#scripts.behaviour.Charging">Charging (class in scripts.behaviour)</a>
+</li>
       <li><a href="modules.html#scripts.controller.ControllerAction">ControllerAction (class in scripts.controller)</a>
 </li>
   </ul></td>
@@ -169,6 +180,8 @@
       <li><a href="modules.html#scripts.behaviour.Charging.execute">execute() (scripts.behaviour.Charging method)</a>
 
       <ul>
+        <li><a href="modules.html#scripts.behaviour.Init.execute">(scripts.behaviour.Init method)</a>
+</li>
         <li><a href="modules.html#scripts.behaviour.Moving.execute">(scripts.behaviour.Moving method)</a>
 </li>
         <li><a href="modules.html#scripts.behaviour.PlanGoal.execute">(scripts.behaviour.PlanGoal method)</a>
@@ -181,6 +194,10 @@
 
 <h2 id="I">I</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules.html#scripts.behaviour.Init">Init (class in scripts.behaviour)</a>
+</li>
+  </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="modules.html#scripts.behaviour.init_state_machine">init_state_machine() (in module scripts.behaviour)</a>
 </li>
@@ -197,6 +214,8 @@
 
       <ul>
         <li><a href="modules.html#module-scripts.behaviour">scripts.behaviour</a>
+</li>
+        <li><a href="modules.html#module-scripts.camera_manager">scripts.camera_manager</a>
 </li>
         <li><a href="modules.html#module-scripts.controller">scripts.controller</a>
 </li>
@@ -253,12 +272,21 @@
 </li>
       </ul></li>
       <li>
+    scripts.camera_manager
+
+      <ul>
+        <li><a href="modules.html#module-scripts.camera_manager">module</a>
+</li>
+      </ul></li>
+      <li>
     scripts.controller
 
       <ul>
         <li><a href="modules.html#module-scripts.controller">module</a>
 </li>
       </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li>
     scripts.owl_interface
 
@@ -266,8 +294,6 @@
         <li><a href="modules.html#module-scripts.owl_interface">module</a>
 </li>
       </ul></li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li>
     scripts.planner
 

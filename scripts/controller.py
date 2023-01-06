@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """
 .. module::controller
    :platform: Ubuntu 20.04
@@ -13,11 +15,14 @@ or upon failure, the :mod:`behaviour` module is notified.
 This module also manages the robot's battery charging.
 
 In this simulated program, only adjacent locations are considered reachable,
-therefore the controller only ever has one waypoint to go towards. Therefore,
-this module simulates work by busy waiting.
+therefore the controller only ever has one waypoint to go towards.
+
+The `move_base package <http://wiki.ros.org/move_base>`_ is used to navigate
+the robot, and the `gmapping package <http://wiki.ros.org/gmapping>`_ is used
+to map the surroundings.
 
 Publishes to:
-  **/state/set_pose** sets the pose (i.e. robot location) in the ontology.
+  **/owl_interface/set_pose** sets the pose (i.e. robot location) in the ontology.
 
 Subscribes to:
   **/state/battery_level** gets the current battery level.
@@ -27,6 +32,7 @@ ServiceProxy:
   **/owl_interface/update_visited** updates the timestamp associated to a location.
 
 Action Server:
+  **/motion/controller/scan** given a scan mode, starts camera scanning\n
   **/motion/controller/move** given a set of viapoints, moves the robot through them.\n
   **/battery/controller/charge** charges the robot.
 """
@@ -37,8 +43,9 @@ import actionlib
 from rospy.exceptions import ROSException
 from exprob_assignment1 import utils
 from exprob_assignment1.msg import *
-from exprob_assignment1.srv import BatteryMode, UpdateVisitedAt
+from exprob_assignment1.srv import *
 from std_msgs.msg import Bool, Float64
+from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 
 LOG_TAG = 'controller'
 
@@ -65,11 +72,10 @@ class ControllerAction():
     # Helper variable used to determine if battery is full or not
     self._is_fully_charged = False
 
-    # Publisher: /state/set_pose
-    self._pub_set_pose = rospy.Publisher('/state/set_pose', Location, queue_size=10)
+    # Publisher: /owl_interface/set_pose
+    self._pub_set_pose = rospy.Publisher('/owl_interface/set_pose', Location, queue_size=1)
 
     # Get current battery level from /state/battery_level
-    # (runs on a separate thread)
     rospy.Subscriber('/state/battery_level', Battery,
           self._subscribe_battery_callback, queue_size = 1)
 
@@ -80,6 +86,17 @@ class ControllerAction():
     # Service: /owl_interface/update_visited
     rospy.wait_for_service('/owl_interface/update_visited')
     self._srv_update_visited = rospy.ServiceProxy('/owl_interface/update_visited', UpdateVisitedAt)
+
+    # Service: /camera_manager/start_scan
+    rospy.wait_for_service('/camera_manager/start_scan')
+    self._srv_start_scan = rospy.ServiceProxy('/camera_manager/start_scan', StartScan)
+
+    # Define the SCANNING action server and start it
+    self._as_scan = actionlib.SimpleActionServer('/motion/controller/scan',
+                                            ScanAction,
+                                            execute_cb = self._execute_scan_cb,
+                                            auto_start = False)
+    self._as_scan.start()
 
     # Define the MOVEMENT action server and start it
     self._as_move = actionlib.SimpleActionServer('/motion/controller/move',
@@ -94,6 +111,45 @@ class ControllerAction():
                                             execute_cb = self._execute_charge_cb,
                                             auto_start = False)
     self._as_charge.start()
+
+  def _execute_scan_cb(self, type):
+    """
+    Callback function for the /motion/controller/scan action server.\n
+    Based on the received request, the robot's camera will either:\n
+    - "marker": perform four complete rotations (upper clockwise, upper
+      counter-clockwise, lower clockwise, lower counter-clockwise). Then,
+      build the ontology through the owl_interface
+    - "room": perform one complete rotation
+
+    Args:
+      type (ScanAction): Type of scan to perform.
+
+    Feedback:
+      ScanFeedback: This should be ignored.
+
+    Result:
+      ScanResult: std_msgs/Empty
+    """
+    # Define messages that are used to publish feedback and result
+    feedback = ScanFeedback()
+    result = ScanResult()
+
+    # Execute action and send feedback
+    # Initiate scan
+    if (type.type == "marker"):
+      rospy.loginfo(utils.tag_log(f'Initiating marker scan...', LOG_TAG))
+      result = self._srv_start_scan("marker")
+
+    elif (type.type == "room"):
+      rospy.loginfo(utils.tag_log(f'Initiating room scan...', LOG_TAG))
+      result = self._srv_start_scan("room")
+
+    # Send feedback (EMPTY)
+    self._as_scan.publish_feedback(feedback)
+
+    self._as_scan.set_succeeded(result)
+
+    rospy.loginfo(utils.tag_log('Scanning complete.', LOG_TAG))
 
   def _execute_move_cb(self, plan):
     """
@@ -115,54 +171,41 @@ class ControllerAction():
     Raises:
       ROSException
     """
-    # Define messages that are used to publish feedback/result
+    # Define messages that are used to publish feedback and result
     feedback = ControlFeedback()
     result = ControlResult()
     feedback.via_points_reached = []
 
     # Execute action and send feedback
-    # Note: the controller is supposed to physically move the robot. Setting
-    # the pose is considered a mere software operation of updating the map to
-    # reflect the current reality. Setting the pose does not actually change
-    # the robot's pose; the physical movement happens here, by the controller.
-    # In reality, this should take a while, but in this simulation the controller
-    # does not actually do any computation, so computation is simulated
+    final_goal = Location()
     for current_goal in plan.via_points:
-      # Simulate robot movement
+      final_goal = current_goal
       rospy.loginfo(utils.tag_log(f'Moving robot to {current_goal.name}', LOG_TAG))
-      self._simulate_computation()
+      # Moves the robot to the goal by sending it to the move_base action server
+      result_move_base = self._move_to_goal(current_goal)
       # Update the map (ontology) by publishing to the /state/set_pose topic
+      rospy.loginfo(utils.tag_log(f'Setting new pose to {current_goal}', LOG_TAG))
       self._pub_set_pose.publish(current_goal)
       # Send feedback
       feedback.via_points_reached.append(current_goal)
       self._as_move.publish_feedback(feedback)
 
     # Check if the final goal has been reached
-    current_location = Location()
-    current_location.name = 'unknown'
-    try:
-      rospy.sleep(1) # Wait for pose to update
-      current_location = rospy.wait_for_message('/state/get_pose', Location, timeout=15)
-    except ROSException:
-      rospy.loginfo(utils.tag_log('Failed to get the current pose', LOG_TAG))
-
-    if (current_location == feedback.via_points_reached[-1]):
-      # Goal reached
-      result.success.data = True
-      # Update location timestamp
-      self._update_location_visited(current_location.name)
-      log_msg = (f'Controller successfully reached final goal.' +
-                 f' Current position: {current_location.name}')
-      self._as_move.set_succeeded(result)
-
-    else:
-      # Failure
+    if not result_move_base:
       result.success.data = False
       log_msg = (f'Controller failed to reach final goal.' +
                  f' Current position: {current_location}')
       self._as_move.set_aborted(result)
-
-    rospy.loginfo(utils.tag_log(log_msg, LOG_TAG))
+      rospy.logerr(utils.tag_log('Failed to get the current pose', LOG_TAG))
+    else:
+      # Goal reached
+      result.success.data = True
+      # Update location timestamp
+      self._update_location_visited(final_goal)
+      self._as_move.set_succeeded(result)
+      log_msg = (f'Controller successfully reached final goal.' +
+                 f' Current position: {final_goal.name}')
+      rospy.loginfo(utils.tag_log(log_msg, LOG_TAG))
 
   def _execute_charge_cb(self, empty):
     """
@@ -184,7 +227,7 @@ class ControllerAction():
     Raises:
       rospy.ServiceException - indicates failure to call service.
     """
-    # Define messages that are used to publish feedback/result
+    # Define messages that are used to publish feedback and result
     feedback = ChargeFeedback()
     result = ChargeResult()
 
@@ -206,11 +249,27 @@ class ControllerAction():
 
     rospy.loginfo(utils.tag_log('Charging has stopped', LOG_TAG))
 
-  def _simulate_computation(self):
+  def _move_to_goal(self, goal_recv):
     """
-    2 second busy waiting to simulate computation, used by :func:`_execute_move_cbs`
+    Calls the move_base action server to move the robot to the coordinates
     """
-    rospy.sleep(2)
+    client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
+    client.wait_for_server()
+
+    goal = MoveBaseGoal()
+    goal.target_pose.header.frame_id = "map"
+    goal.target_pose.header.stamp = rospy.Time.now()
+    goal.target_pose.pose.position.x = goal_recv.x
+    goal.target_pose.pose.position.y = goal_recv.y
+    goal.target_pose.pose.orientation.w = 1.0
+
+    client.send_goal(goal)
+    wait = client.wait_for_result()
+    if not wait:
+        rospy.logerr(utils.tag_log(f'Failed to move robot: move_base not available!', LOG_TAG))
+    else:
+        rospy.loginfo(utils.tag_log(f'move_base reports completion', LOG_TAG))
+        return client.get_result()
 
   def _battery_charge_start(self):
     """
@@ -259,8 +318,8 @@ class ControllerAction():
       This function should only be used by :func:`_execute_move_cb`.
     """
     try:
-      loc_to_update = UpdateVisitedAt()
-      loc_to_update.name = curr_loc
+      loc_to_update = UpdateVisitedAtRequest()
+      loc_to_update = curr_loc
       return self._srv_update_visited(loc_to_update)
     except rospy.ServiceException as e:
       rospy.loginfo(utils.tag_log(f'Location time visited update failed: {e}', LOG_TAG))

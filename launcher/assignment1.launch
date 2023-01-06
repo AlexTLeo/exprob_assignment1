@@ -46,4 +46,12 @@
         launch-prefix="xterm -e"
   />
 
+  <!-- camera_manager node -->
+  <node pkg="exprob_assignment1"
+        type="camera_manager.py"
+        name="camera_manager"
+        output="screen"
+        launch-prefix="xterm -e"
+  />
+
 </launch>

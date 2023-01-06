@@ -39,7 +39,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../modules.html">Robot Controller Node</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../modules.html#module-scripts.planner">Robot Planner Node</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../modules.html#module-scripts.behaviour">Robot Behaviour Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html#robot-behaviour-node">Robot Behaviour Node</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../modules.html#module-scripts.robot_state">Robot State Node</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../modules.html#module-scripts.owl_interface">OWL Ontology Interface Node</a></li>
 </ul>
@@ -69,7 +69,9 @@
            <div itemprop="articleBody">
              
   <h1>Source code for scripts.planner</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span></span><span class="ch">#!/usr/bin/env python</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">.. module::planner</span>
 <span class="sd">   :platform: Ubuntu 20.04</span>
 <span class="sd">   :snyopsis: This module calculates the shortest path to reach the goal</span>
@@ -90,8 +92,8 @@
 <span class="kn">import</span> <span class="nn">rospy</span>
 <span class="kn">import</span> <span class="nn">threading</span>
 <span class="kn">import</span> <span class="nn">actionlib</span>
-<span class="kn">from</span> <span class="nn">assignment1</span> <span class="kn">import</span> <span class="n">utils</span>
-<span class="kn">from</span> <span class="nn">assignment1.msg</span> <span class="kn">import</span> <span class="n">Location</span><span class="p">,</span> <span class="n">PlanAction</span><span class="p">,</span> <span class="n">PlanFeedback</span><span class="p">,</span> <span class="n">PlanResult</span>
+<span class="kn">from</span> <span class="nn">exprob_assignment1</span> <span class="kn">import</span> <span class="n">utils</span>
+<span class="kn">from</span> <span class="nn">exprob_assignment1.msg</span> <span class="kn">import</span> <span class="n">Location</span><span class="p">,</span> <span class="n">PlanAction</span><span class="p">,</span> <span class="n">PlanFeedback</span><span class="p">,</span> <span class="n">PlanResult</span>
 
 <span class="n">LOG_TAG</span> <span class="o">=</span> <span class="s1">&#39;planner&#39;</span>
 

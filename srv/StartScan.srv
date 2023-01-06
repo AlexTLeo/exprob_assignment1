@@ -1,0 +1,4 @@
+# can be "marker" or "room"
+string type
+---
+bool success

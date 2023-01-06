@@ -50,6 +50,9 @@
         <ObjectProperty IRI="#isIn"/>
     </Declaration>
     <Declaration>
+        <DataProperty IRI="#coordinates"/>
+    </Declaration>
+    <Declaration>
         <DataProperty IRI="#now"/>
     </Declaration>
     <Declaration>
@@ -390,6 +393,10 @@
         <Class IRI="#LOCATION"/>
     </ObjectPropertyRange>
     <DataPropertyDomain>
+        <DataProperty IRI="#coordinates"/>
+        <Class IRI="#LOCATION"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
         <DataProperty IRI="#now"/>
         <Class IRI="#ROBOT"/>
     </DataPropertyDomain>
@@ -401,6 +408,10 @@
         <DataProperty IRI="#visitedAt"/>
         <Class IRI="#LOCATION"/>
     </DataPropertyDomain>
+    <DataPropertyRange>
+        <DataProperty IRI="#coordinates"/>
+        <Datatype abbreviatedIRI="xsd:string"/>
+    </DataPropertyRange>
     <DataPropertyRange>
         <DataProperty IRI="#now"/>
         <Datatype abbreviatedIRI="xsd:long"/>
@@ -565,6 +576,11 @@
             </ObjectPropertyAtom>
         </Head>
     </DLSafeRule>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>#coordinates</IRI>
+        <Literal>Coordinates of the location, expressed in the following format: &quot;x, y&quot;</Literal>
+    </AnnotationAssertion>
 </Ontology>
 
 

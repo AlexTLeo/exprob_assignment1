@@ -39,6 +39,7 @@
               <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul class="current">
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Robot Controller Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#module-scripts.camera_manager">Camera Manager Node</a></li>
 <li class="toctree-l1"><a class="reference internal" href="#module-scripts.planner">Robot Planner Node</a></li>
 <li class="toctree-l1"><a class="reference internal" href="#module-scripts.behaviour">Robot Behaviour Node</a></li>
 <li class="toctree-l1"><a class="reference internal" href="#module-scripts.robot_state">Robot State Node</a></li>
@@ -77,17 +78,20 @@ physically moves the robot through them. Once the final destination is reached,
 or upon failure, the <code class="xref py py-mod docutils literal notranslate"><span class="pre">behaviour</span></code> module is notified.
 This module also manages the robot’s battery charging.</p>
 <p>In this simulated program, only adjacent locations are considered reachable,
-therefore the controller only ever has one waypoint to go towards. Therefore,
-this module simulates work by busy waiting.</p>
+therefore the controller only ever has one waypoint to go towards.</p>
+<p>The <a class="reference external" href="http://wiki.ros.org/move_base">move_base package</a> is used to navigate
+the robot, and the <a class="reference external" href="http://wiki.ros.org/gmapping">gmapping package</a> is used
+to map the surroundings.</p>
 <dl>
-<dt>Publishes to:</dt><dd><p><strong>/state/set_pose</strong> sets the pose (i.e. robot location) in the ontology.</p>
+<dt>Publishes to:</dt><dd><p><strong>/owl_interface/set_pose</strong> sets the pose (i.e. robot location) in the ontology.</p>
 </dd>
 <dt>Subscribes to:</dt><dd><p><strong>/state/battery_level</strong> gets the current battery level.</p>
 </dd>
 <dt>ServiceProxy:</dt><dd><p><strong>/state/battery/set_mode</strong> sets the battery to either charge or discharge.</p>
 <p><strong>/owl_interface/update_visited</strong> updates the timestamp associated to a location.</p>
 </dd>
-<dt>Action Server:</dt><dd><p><strong>/motion/controller/move</strong> given a set of viapoints, moves the robot through them.</p>
+<dt>Action Server:</dt><dd><p><strong>/motion/controller/scan</strong> given a scan mode, starts camera scanning</p>
+<p><strong>/motion/controller/move</strong> given a set of viapoints, moves the robot through them.</p>
 <p><strong>/battery/controller/charge</strong> charges the robot.</p>
 </dd>
 </dl>
@@ -185,9 +189,33 @@ one-by-one, until the final one is reached.</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="scripts.controller.ControllerAction._simulate_computation">
-<span class="sig-name descname"><span class="pre">_simulate_computation</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/controller.html#ControllerAction._simulate_computation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.controller.ControllerAction._simulate_computation" title="Permalink to this definition"></a></dt>
-<dd><p>2 second busy waiting to simulate computation, used by <code class="xref py py-func docutils literal notranslate"><span class="pre">_execute_move_cbs()</span></code></p>
+<dt class="sig sig-object py" id="scripts.controller.ControllerAction._execute_scan_cb">
+<span class="sig-name descname"><span class="pre">_execute_scan_cb</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">type</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/controller.html#ControllerAction._execute_scan_cb"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.controller.ControllerAction._execute_scan_cb" title="Permalink to this definition"></a></dt>
+<dd><p>Callback function for the /motion/controller/scan action server.</p>
+<p>Based on the received request, the robot’s camera will either:</p>
+<ul class="simple">
+<li><p>“marker”: perform four complete rotations (upper clockwise, upper
+counter-clockwise, lower clockwise, lower counter-clockwise). Then,
+build the ontology through the owl_interface</p></li>
+<li><p>“room”: perform one complete rotation</p></li>
+</ul>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>type</strong> (<em>ScanAction</em>) – Type of scan to perform.</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Feedback:</dt><dd><p>ScanFeedback: This should be ignored.</p>
+</dd>
+<dt>Result:</dt><dd><p>ScanResult: std_msgs/Empty</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="scripts.controller.ControllerAction._move_to_goal">
+<span class="sig-name descname"><span class="pre">_move_to_goal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">goal_recv</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/controller.html#ControllerAction._move_to_goal"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.controller.ControllerAction._move_to_goal" title="Permalink to this definition"></a></dt>
+<dd><p>Calls the move_base action server to move the robot to the coordinates</p>
 </dd></dl>
 
 <dl class="py method">
@@ -216,6 +244,66 @@ battery level.</p>
 <p class="admonition-title">Note</p>
 <p>This function should only be used by <a class="reference internal" href="#scripts.controller.ControllerAction._execute_move_cb" title="scripts.controller.ControllerAction._execute_move_cb"><code class="xref py py-func docutils literal notranslate"><span class="pre">_execute_move_cb()</span></code></a>.</p>
 </div>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="module-scripts.camera_manager">
+<span id="camera-manager-node"></span><h1>Camera Manager Node<a class="headerlink" href="#module-scripts.camera_manager" title="Permalink to this headline"></a></h1>
+<p>This module manages the camera joint and scans for surrounding
+markers. The camera can either scan the room for markers, “marker” mode, or scan
+a room normally doing a full rotation, “room” mode.</p>
+<dl>
+<dt>Publises to:</dt><dd><p><strong>/Giskard/joint_camera_controller/command</strong>: publishes commands to the camera z-axis rotational joint.</p>
+<p><strong>/Giskard/joint_camera_vertical_controller/command</strong>: publishes commands to the camera z-axis prismatic joint.</p>
+</dd>
+<dt>Subscribes to:</dt><dd><p><strong>/marker_publisher/marker_id</strong>: gets all marker IDs when in “marker” scan mode.</p>
+</dd>
+<dt>Service:</dt><dd><p><strong>/camera_manager/start_scan</strong>: given a scan mode, starts scanning.</p>
+</dd>
+</dl>
+<dl class="py class">
+<dt class="sig sig-object py" id="scripts.camera_manager.CameraManager">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">scripts.camera_manager.</span></span><span class="sig-name descname"><span class="pre">CameraManager</span></span><a class="reference internal" href="_modules/scripts/camera_manager.html#CameraManager"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.camera_manager.CameraManager" title="Permalink to this definition"></a></dt>
+<dd><p>Class representing the camera manager.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="scripts.camera_manager.CameraManager._build_ontology">
+<span class="sig-name descname"><span class="pre">_build_ontology</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/camera_manager.html#CameraManager._build_ontology"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.camera_manager.CameraManager._build_ontology" title="Permalink to this definition"></a></dt>
+<dd><p>Sends the detected marker IDs to the marker server, gets the corresponding
+information and builds the ontology by interfacing with the owl_interface</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="scripts.camera_manager.CameraManager._publish_marker_scan">
+<span class="sig-name descname"><span class="pre">_publish_marker_scan</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">thread_build_ontology</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/camera_manager.html#CameraManager._publish_marker_scan"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.camera_manager.CameraManager._publish_marker_scan" title="Permalink to this definition"></a></dt>
+<dd><p>Publishes commands to the /Giskard/joint_camera_controller/command topic and
+also to the /Giskard/joint_camera_vertical_controller/command topic</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="scripts.camera_manager.CameraManager._publish_room_scan">
+<span class="sig-name descname"><span class="pre">_publish_room_scan</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">thread_build_ontology</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/camera_manager.html#CameraManager._publish_room_scan"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.camera_manager.CameraManager._publish_room_scan" title="Permalink to this definition"></a></dt>
+<dd><p>Publishes commands to the /Giskard/joint_camera_controller/command topic and
+also to the /Giskard/joint_camera_vertical_controller/command topic.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="scripts.camera_manager.CameraManager._service_start_scan">
+<span class="sig-name descname"><span class="pre">_service_start_scan</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">type</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/camera_manager.html#CameraManager._service_start_scan"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.camera_manager.CameraManager._service_start_scan" title="Permalink to this definition"></a></dt>
+<dd><p>Starts the scan, based on requested type (either “marker” or “room”)</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="scripts.camera_manager.CameraManager._subscribe_marker_id_callback">
+<span class="sig-name descname"><span class="pre">_subscribe_marker_id_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/camera_manager.html#CameraManager._subscribe_marker_id_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.camera_manager.CameraManager._subscribe_marker_id_callback" title="Permalink to this definition"></a></dt>
+<dd><p>Subscribes to /marker_publisher/marker_id and gets the detected marker IDs,
+which are added to an array which will contain all detected IDs.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>data</strong> (<em>Int32</em>) – the marker ID</p>
+</dd>
+</dl>
 </dd></dl>
 
 </dd></dl>
@@ -315,6 +403,27 @@ robot has been fully charged, transition to PLAN_GOAL.</p>
 </dd></dl>
 
 <dl class="py class">
+<dt class="sig sig-object py" id="scripts.behaviour.Init">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">scripts.behaviour.</span></span><span class="sig-name descname"><span class="pre">Init</span></span><a class="reference internal" href="_modules/scripts/behaviour.html#Init"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.behaviour.Init" title="Permalink to this definition"></a></dt>
+<dd><p>This class represents the INIT state of the state machine, in which the
+robot scans the surrounding markers and builds the map (as an ontology).
+Afterwards, the robot moves to the room E and awaits further instructions.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="scripts.behaviour.Init._scan_markers">
+<span class="sig-name descname"><span class="pre">_scan_markers</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/behaviour.html#Init._scan_markers"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.behaviour.Init._scan_markers" title="Permalink to this definition"></a></dt>
+<dd><p>Scans the starting room for markers to build the map</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="scripts.behaviour.Init.execute">
+<span class="sig-name descname"><span class="pre">execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">userdata</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/behaviour.html#Init.execute"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.behaviour.Init.execute" title="Permalink to this definition"></a></dt>
+<dd><p>Every STATE_UPDATE_PERIOD, check if the scan is complete. If so, move on to
+the CHARGING state, otherwise stay here.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
 <dt class="sig sig-object py" id="scripts.behaviour.Moving">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">scripts.behaviour.</span></span><span class="sig-name descname"><span class="pre">Moving</span></span><a class="reference internal" href="_modules/scripts/behaviour.html#Moving"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.behaviour.Moving" title="Permalink to this definition"></a></dt>
 <dd><p>This class represents the MOVING state of the state machine, in which the robot,
@@ -382,22 +491,18 @@ state.</p>
 <dt class="sig sig-object py" id="scripts.behaviour.Waiting">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">scripts.behaviour.</span></span><span class="sig-name descname"><span class="pre">Waiting</span></span><a class="reference internal" href="_modules/scripts/behaviour.html#Waiting"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.behaviour.Waiting" title="Permalink to this definition"></a></dt>
 <dd><p>This class represents the WAITING state of the state machine, in which the robot,
-having reached its goal, waits for a random amount of time before going back
-to the MOVING state.</p>
+having reached its goal, scans the room.</p>
 <dl class="py method">
-<dt class="sig sig-object py" id="scripts.behaviour.Waiting._simulate_work">
-<span class="sig-name descname"><span class="pre">_simulate_work</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/behaviour.html#Waiting._simulate_work"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.behaviour.Waiting._simulate_work" title="Permalink to this definition"></a></dt>
-<dd><p>Simulate work by sleeping for some seconds.
-This is split up into multiple smaller waits so that it may be preempted
-in case of critically low battery.</p>
+<dt class="sig sig-object py" id="scripts.behaviour.Waiting._scan_room">
+<span class="sig-name descname"><span class="pre">_scan_room</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/behaviour.html#Waiting._scan_room"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.behaviour.Waiting._scan_room" title="Permalink to this definition"></a></dt>
+<dd><p>Scans the room</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="scripts.behaviour.Waiting.execute">
 <span class="sig-name descname"><span class="pre">execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">userdata</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/behaviour.html#Waiting.execute"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.behaviour.Waiting.execute" title="Permalink to this definition"></a></dt>
-<dd><p>While waiting, keep checking if the battery gets too low. If it goes below
-the critical threshold, then interrupt the waiting and transition to the
-CHARGING state.</p>
+<dd><p>If the battery goes below the critical threshold, then
+transition to the CHARGING state.</p>
 <p>When done waiting, transition to the PLAN_GOAL state.</p>
 </dd></dl>
 
@@ -450,12 +555,9 @@ requests to change the battery mode to charging or discharging.</p>
 <p><strong>/robot_state/battery_publish</strong> rate at which the battery level is published</p>
 </dd>
 <dt>Publishes to:</dt><dd><p><strong>/state/battery_level</strong> broadcasts the robot battery level.</p>
-<p><strong>/state/map/get_goal</strong> broadcasts the next goal.</p>
 <p><strong>/state/get_pose</strong> broadcasts the current pose (location).</p>
-<p><strong>/owl_interface/set_pose</strong> sends the requested pose setting to <code class="xref py py-mod docutils literal notranslate"><span class="pre">owl_interface</span></code>.</p>
 </dd>
-<dt>Subscribes to:</dt><dd><p><strong>/owl_interface/goal</strong> gets the next goal from <code class="xref py py-mod docutils literal notranslate"><span class="pre">owl_interface</span></code>.</p>
-<p><strong>/owl_interface/get_pose</strong> gets the current pose from <code class="xref py py-mod docutils literal notranslate"><span class="pre">owl_interface</span></code>.</p>
+<dt>Subscribes to:</dt><dd><p><strong>/owl_interface/get_pose</strong> gets the current pose from <code class="xref py py-mod docutils literal notranslate"><span class="pre">owl_interface</span></code>.</p>
 <p><strong>/state/set_pose</strong> receive incoming pose requests.</p>
 </dd>
 <dt>Service:</dt><dd><p><strong>/state/battery/set_mode</strong> changes battery mode to either ‘charging’ or ‘discharging’ by asking <code class="xref py py-mod docutils literal notranslate"><span class="pre">owl_interface</span></code>.</p>
@@ -508,28 +610,6 @@ requests to change the battery mode to charging or discharging.</p>
 </dl>
 </dd></dl>
 
-<dl class="py method">
-<dt class="sig sig-object py" id="scripts.robot_state.RobotState._subscribe_goal_callback">
-<span class="sig-name descname"><span class="pre">_subscribe_goal_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">goal</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/robot_state.html#RobotState._subscribe_goal_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.robot_state.RobotState._subscribe_goal_callback" title="Permalink to this definition"></a></dt>
-<dd><p>Subscribes to /owl_interface/goal and gets the next goal. Then, republishes the goal on the /state/map/get_goal topic.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><p><strong>goal</strong> (<em>Location</em>) – the current goal</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="scripts.robot_state.RobotState._subscribe_set_pose_callback">
-<span class="sig-name descname"><span class="pre">_subscribe_set_pose_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pose</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/robot_state.html#RobotState._subscribe_set_pose_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.robot_state.RobotState._subscribe_set_pose_callback" title="Permalink to this definition"></a></dt>
-<dd><p>Subscribes to /state/set_pose and gets the requested pose. Then, republishes the pose on the /owl_interface/set_pose topic, which will be used by the <code class="xref py py-mod docutils literal notranslate"><span class="pre">owl_interface</span></code> module to change the pose in the ontology.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><p><strong>pose</strong> (<em>Location</em>) – the new pose to set</p>
-</dd>
-</dl>
-</dd></dl>
-
 </dd></dl>
 
 </div>
@@ -546,7 +626,6 @@ to facilitate operations.</p>
 <p><strong>/battery/threshold_low</strong> the threshold below which the battery should be considered as ‘low’.</p>
 </dd>
 <dt>Publishes to:</dt><dd><p><strong>/owl_interface/get_pose</strong> the current robot location.</p>
-<p><strong>/owl_interface/goal</strong> the current goal.</p>
 </dd>
 <dt>Subscribes to:</dt><dd><p><strong>/owl_interface/set_pose</strong> receive a new pose to set.</p>
 <p><strong>/state/battery_level</strong> receive the robot’s current battery level.</p>
@@ -561,6 +640,13 @@ to facilitate operations.</p>
 <dt class="sig sig-object py" id="scripts.owl_interface.OwlInterface">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">scripts.owl_interface.</span></span><span class="sig-name descname"><span class="pre">OwlInterface</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">robot_name</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/owl_interface.html#OwlInterface"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.owl_interface.OwlInterface" title="Permalink to this definition"></a></dt>
 <dd><p>This class implements the aforementioned functionalities.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="scripts.owl_interface.OwlInterface._infer_room_type">
+<span class="sig-name descname"><span class="pre">_infer_room_type</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">room_name</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/owl_interface.html#OwlInterface._infer_room_type"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.owl_interface.OwlInterface._infer_room_type" title="Permalink to this definition"></a></dt>
+<dd><p>Infer the room type (ROOM, CORRIDOR or generally LOCATION) based on the
+room name</p>
+</dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="scripts.owl_interface.OwlInterface._init_armor_client">
 <span class="sig-name descname"><span class="pre">_init_armor_client</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">map_dir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">client_id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ref_name</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/owl_interface.html#OwlInterface._init_armor_client"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.owl_interface.OwlInterface._init_armor_client" title="Permalink to this definition"></a></dt>
@@ -584,15 +670,6 @@ environment map and its current situation.</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="scripts.owl_interface.OwlInterface._publish_goal">
-<span class="sig-name descname"><span class="pre">_publish_goal</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/owl_interface.html#OwlInterface._publish_goal"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.owl_interface.OwlInterface._publish_goal" title="Permalink to this definition"></a></dt>
-<dd><p>Publishes current goal to /owl_interface/goal at a rate defined by the
-RATE_GOAL global variable.</p>
-<p>This runs on a separate thread from the goal search, to avoid slowing down the
-publisher in case of lengthy computation times.</p>
-</dd></dl>
-
-<dl class="py method">
 <dt class="sig sig-object py" id="scripts.owl_interface.OwlInterface._publish_pose">
 <span class="sig-name descname"><span class="pre">_publish_pose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/owl_interface.html#OwlInterface._publish_pose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.owl_interface.OwlInterface._publish_pose" title="Permalink to this definition"></a></dt>
 <dd><p>Publishes the current pose to the /owl_interface/get_pose topic at a rate
@@ -600,17 +677,14 @@ defined by the RATE_GET_POSE global variable.</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="scripts.owl_interface.OwlInterface._search_next_goal">
-<span class="sig-name descname"><span class="pre">_search_next_goal</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/owl_interface.html#OwlInterface._search_next_goal"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.owl_interface.OwlInterface._search_next_goal" title="Permalink to this definition"></a></dt>
-<dd><p>Looks for the next goal and saves it internally. It will be published by the
-/owl_interface/goal publisher.</p>
-<p>The rule for finding the next goal is the following: only adjacent locations
-are considered ‘reachable’. Among these, the most urgent ones are the ones
-that were visited a long time ago. If no urgent location is found, a random
-one is selected. If the battery is low, only rooms with a charging station
-will be selected as acceptable goals.</p>
-<p>If it is strictly necessary to receive the latest goal, then use the service
-/owl_interface/get_goal instead.</p>
+<dt class="sig sig-object py" id="scripts.owl_interface.OwlInterface._service_add_room">
+<span class="sig-name descname"><span class="pre">_service_add_room</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">req</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/owl_interface.html#OwlInterface._service_add_room"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.owl_interface.OwlInterface._service_add_room" title="Permalink to this definition"></a></dt>
+<dd><p>A new room is added along with details of its surroundings and its coordinates</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>req</strong> (<em>AddRoom</em>) – room name, coordinates, connections</p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py method">
@@ -675,7 +749,7 @@ Then, updates the ontology with that new pose.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="scripts.owl_interface.OwlInterface._update_robot_time">
 <span class="sig-name descname"><span class="pre">_update_robot_time</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/scripts/owl_interface.html#OwlInterface._update_robot_time"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#scripts.owl_interface.OwlInterface._update_robot_time" title="Permalink to this definition"></a></dt>
-<dd><p>Updates the robot’s internal clock in the ontology once every second.</p>
+<dd><p>Updates the robot’s internal clock in the ontology once every five seconds.</p>
 </dd></dl>
 
 <dl class="py method">

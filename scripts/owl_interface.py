@@ -22,7 +22,6 @@ ROS Parameters:
 
 Publishes to:
   **/owl_interface/get_pose** the current robot location.\n
-  **/owl_interface/goal** the current goal.
 
 Subscribes to:
   **/owl_interface/set_pose** receive a new pose to set.\n
@@ -43,7 +42,7 @@ from exprob_assignment1 import utils
 from os.path import dirname, realpath
 from armor_api.armor_client import ArmorClient
 from exprob_assignment1.msg import Location, Battery
-from exprob_assignment1.srv import UpdateVisitedAt, GetGoal, GetPose
+from exprob_assignment1.srv import *
 from std_msgs.msg import Empty
 
 LOG_TAG = 'owl_interface'
@@ -52,7 +51,7 @@ RATE_GOAL = 0.5 # Hz
 RATE_GET_POSE = 0.5 # Hz
 RATE_CHECK_BATTERY = 0.5 # Hz
 
-class OwlInterface:
+class OwlInterface():
   """
   This class implements the aforementioned functionalities.
   """
@@ -62,6 +61,9 @@ class OwlInterface:
   def __init__(self, robot_name):
     # Initialisation
     rospy.init_node('owl_interface', anonymous=True)
+
+    # Give some time for ARMOR server to start...
+    rospy.sleep(3)
 
     # Log
     log_msg = ('Initialised node: owl_interface')
@@ -97,16 +99,13 @@ class OwlInterface:
     self._srv_get_pose = rospy.Service('/owl_interface/get_pose',
                               GetPose, self._service_get_pose)
 
+    # Service to add a new room
+    self._srv_add_room = rospy.Service('/owl_interface/add_room',
+                              AddRoom, self._service_add_room)
+
     # This function regularly updates the robot's internal clock
     thread_update_robot_time = threading.Thread(target=self._update_robot_time)
     thread_update_robot_time.start()
-
-    # Publish the next goal
-    thread_get_goal = threading.Thread(target=self._search_next_goal)
-    thread_get_goal.start()
-
-    # Give some time to find the first goal...
-    rospy.sleep(1)
 
     # Publish the current pose
     thread_pub_pose = threading.Thread(target=self._publish_pose)
@@ -116,9 +115,6 @@ class OwlInterface:
     self._sub_set_pose = rospy.Subscriber('/owl_interface/set_pose', Location,
                                           self._subscribe_set_pose_callback,
                                           queue_size = 1)
-    # Publish the goal
-    thread_pub_goal = threading.Thread(target=self._publish_goal)
-    thread_pub_goal.start()
 
     # Service to update the visitedAt data property
     self._srv_update_visited = rospy.Service('/owl_interface/update_visited',
@@ -155,10 +151,10 @@ class OwlInterface:
 
   def _update_robot_time(self):
     """
-    Updates the robot's internal clock in the ontology once every second.
+    Updates the robot's internal clock in the ontology once every five seconds.
     """
     armor_client = self._armor_client
-    rate = rospy.Rate(1)
+    rate = rospy.Rate(0.2)
 
     while not rospy.is_shutdown():
       # Get current time and old time
@@ -218,6 +214,7 @@ class OwlInterface:
     """
     goal = Location()
     armor_client = self._armor_client
+
     # Find reachable locations
     locations_reachable = armor_client.query.objectprop_b2_ind('canReach', self.robot_name)
 
@@ -270,75 +267,24 @@ class OwlInterface:
           goal.name = locations_reachable_charger[0]
           rospy.loginfo(utils.tag_log(f'Picking reachable charging station: {goal.name}', LOG_TAG))
 
+    # Get coordinates of goal
+    coords_str = armor_client.query.dataprop_b2_ind('coordinates', goal.name)
+
+    if not coords_str:
+      goal.x = 0
+      goal.y = 0
+    else:
+      # Manipulating the string and strpping extra text...
+      coords_str = coords_str[0]
+      coords_str = coords_str.split("^^")[0]
+      coords_str = coords_str.replace('"', '')
+      coords = coords_str.split(', ')
+
+      # Add coordinates to msg
+      goal.x = float(coords[0])
+      goal.y = float(coords[1])
+
     return goal
-
-  def _search_next_goal(self):
-    """
-    Looks for the next goal and saves it internally. It will be published by the
-    /owl_interface/goal publisher.
-
-    The rule for finding the next goal is the following: only adjacent locations
-    are considered 'reachable'. Among these, the most urgent ones are the ones
-    that were visited a long time ago. If no urgent location is found, a random
-    one is selected. If the battery is low, only rooms with a charging station
-    will be selected as acceptable goals.
-
-    If it is strictly necessary to receive the latest goal, then use the service
-    /owl_interface/get_goal instead.
-    """
-    rate = rospy.Rate(RATE_SEARCH)
-    goal = Location()
-
-    while not rospy.is_shutdown():
-      armor_client = self._armor_client
-      # Find reachable locations
-      locations_reachable = armor_client.query.objectprop_b2_ind('canReach', self.robot_name)
-
-      # If battery level is low, prioritise charging station, otherwise operate
-      # normally
-      if self._is_battery_low == False:
-        # Get all urgent locations
-        locations_urgent = armor_client.query.ind_b2_class('URGENT')
-        # Check for reachable urgent locations, if any
-        locations_urgent_reachable = list(set(locations_reachable).intersection(locations_urgent))
-
-        # If there are no urgent locations, pick a random reachable location
-        if (len(locations_urgent_reachable) == 0):
-          goal.name = locations_reachable[0]
-          rospy.loginfo(utils.tag_log(f'Picking reachable location: {goal.name}', LOG_TAG))
-        else:
-          goal.name = locations_urgent_reachable[0]
-          rospy.loginfo(utils.tag_log(f'Picking urgent location: {goal.name}', LOG_TAG))
-      else:
-        # If exists, get closest charging station, otherwise get a random location
-        # and try again next search.
-        # In this simulation, we know that E is a charging station.
-        location_charger = ['E']
-
-        # First of all, check if already in 'E'
-        location_current = armor_client.query.objectprop_b2_ind('isIn', self.robot_name)
-
-        if (location_current[0] == location_charger[0]):
-          # We are already here! Just send the same goal again.
-          goal.name = location_current[0]
-          rospy.loginfo(utils.tag_log(f'Already at charging station. Sending same location: {goal.name}', LOG_TAG))
-
-        else:
-          # If not there already, then check if E is among the reachable locations.
-          locations_reachable_charger = list(set(locations_reachable).intersection(location_charger))
-
-          if (len(locations_reachable_charger) == 0):
-            # If no charger locations reachable, pick a random reachable location
-            goal.name = locations_reachable[0]
-            rospy.loginfo(utils.tag_log(f'Charging station not reachable. Picking reachable location: {goal.name}', LOG_TAG))
-          else:
-            # Charger found
-            goal.name = locations_reachable_charger[0]
-            rospy.loginfo(utils.tag_log(f'Picking reachable charging station: {goal.name}', LOG_TAG))
-
-      self._current_goal = goal
-
-      rate.sleep()
 
   def _publish_pose(self):
     """
@@ -381,6 +327,59 @@ class OwlInterface:
 
     return current_location
 
+  def _service_add_room(self, req):
+    """
+    A new room is added along with details of its surroundings and its coordinates
+
+    Args:
+      req (AddRoom): room name, coordinates, connections
+    """
+    armor_client = self._armor_client
+
+    # Get current robot location
+    room_name = req.room
+    coord_x = req.x
+    coord_y = req.y
+    connections = req.connections
+    room_type = self._infer_room_type(room_name)
+
+    # Add room and type
+    armor_client.manipulation.add_ind_to_class(room_name, room_type)
+    # Add coordinates
+    coordinates = f'{coord_x}, {coord_y}'
+    armor_client.manipulation.replace_one_dataprop_b2_ind('coordinates',
+                                                          room_name,
+                                                          'STRING',
+                                                          coordinates)
+
+    # Check all connections...
+    for pair in connections:
+      door_name = pair.through_door
+
+      # Add the door
+      armor_client.manipulation.add_ind_to_class(door_name, 'DOOR')
+      armor_client.manipulation.add_objectprop_to_ind('hasDoor', room_name,
+                                                        door_name)
+
+    armor_client.utils.sync_buffered_reasoner()
+    armor_client.utils.apply_buffered_changes()
+
+    rospy.loginfo(utils.tag_log(f'Added new connections to {room_name}:\n{req}', LOG_TAG))
+
+    return AddRoomResponse()
+
+  def _infer_room_type(self, room_name):
+    """
+    Infer the room type (ROOM, CORRIDOR or generally LOCATION) based on the
+    room name
+    """
+    if (room_name.startswith("C") or room_name.startswith("E")):
+      return "CORRIDOR"
+    elif (room_name.startswith("R")):
+      return "ROOM"
+    else:
+      return "LOCATION"
+
   def _subscribe_set_pose_callback(self, pose):
     """
     Subscribes to /owl_interface/set_pose and receives new pose requests.
@@ -395,33 +394,14 @@ class OwlInterface:
     current_location = Location() # Needed by armor_py_api
     current_location.name = armor_client.query.objectprop_b2_ind('isIn', self.robot_name)[0]
 
-    # Update isIn object property
-    armor_client.manipulation.replace_objectprop_b2_ind('isIn', self.robot_name,
-                                      new_location.name, current_location.name)
-    armor_client.utils.sync_buffered_reasoner()
-    armor_client.utils.apply_buffered_changes()
+    if not (current_location.name == new_location.name):
+      # Update isIn object property
+      armor_client.manipulation.replace_objectprop_b2_ind('isIn', self.robot_name,
+                                        new_location.name, current_location.name)
+      armor_client.utils.sync_buffered_reasoner()
+      armor_client.utils.apply_buffered_changes()
 
-    rospy.loginfo(utils.tag_log(f'Set new pose: {new_location.name}', LOG_TAG))
-
-  def _publish_goal(self):
-    """
-    Publishes current goal to /owl_interface/goal at a rate defined by the
-    RATE_GOAL global variable.
-
-    This runs on a separate thread from the goal search, to avoid slowing down the
-    publisher in case of lengthy computation times.
-    """
-    pub_goal = rospy.Publisher('/owl_interface/goal', Location, queue_size = 1, latch = True)
-    rate = rospy.Rate(RATE_GOAL)
-    goal_msg = Location()
-
-    while not rospy.is_shutdown():
-      goal_msg = self._current_goal
-      pub_goal.publish(goal_msg)
-
-      rospy.loginfo(utils.tag_log(f'Published goal: {goal_msg.name}', LOG_TAG))
-
-      rate.sleep()
+      rospy.loginfo(utils.tag_log(f'Set new pose: {new_location.name}', LOG_TAG))
 
   def _update_visited(self, data):
     """

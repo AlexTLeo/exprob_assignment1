@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """
 .. module::planner
    :platform: Ubuntu 20.04

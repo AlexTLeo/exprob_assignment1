@@ -1,0 +1,19 @@
+###### The controller scanning interface
+
+### Action Server Goal
+
+# When this is received, the server will start the scanning. It can be either a
+# "room" scan or a "marker" scan.
+string type
+
+---
+
+### Action Server Result
+
+bool success
+
+---
+
+### Action Server Feedback
+
+std_msgs/Empty empty

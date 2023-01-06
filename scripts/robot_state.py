@@ -20,12 +20,9 @@ ROS Parameters:
 
 Publishes to:
   **/state/battery_level** broadcasts the robot battery level.\n
-  **/state/map/get_goal** broadcasts the next goal.\n
   **/state/get_pose** broadcasts the current pose (location).\n
-  **/owl_interface/set_pose** sends the requested pose setting to :mod:`owl_interface`.
 
 Subscribes to:
-  **/owl_interface/goal** gets the next goal from :mod:`owl_interface`.\n
   **/owl_interface/get_pose** gets the current pose from :mod:`owl_interface`.\n
   **/state/set_pose** receive incoming pose requests.
 
@@ -45,7 +42,7 @@ LOG_TAG = 'robot_state'
 
 STARTING_BATTERY_LEVEL = 100.0 # battery can go from 0.0 to 100.0
 
-class RobotState:
+class RobotState():
   """
   This class implements the aforementioned functionalities.
   """
@@ -65,24 +62,14 @@ class RobotState:
     if not rospy.has_param('robot_state/battery_charge_per_tick'):
       rospy.set_param('robot_state/battery_charge_per_tick', 10)
     if not rospy.has_param('robot_state/battery_discharge_per_tick'):
-      rospy.set_param('robot_state/battery_discharge_per_tick', 1)
+      rospy.set_param('robot_state/battery_discharge_per_tick', 0.5)
     if not rospy.has_param('robot_state/battery_publish'):
       rospy.set_param('robot_state/battery_publish', 1)
-
-    # Subscribe to the /owl_interface/goal topic and get the next goal
-    # Then republish it
-    self._sub_next_goal = rospy.Subscriber('/owl_interface/goal', Location,
-                                          self._subscribe_goal_callback, queue_size = 1)
 
     # Subscribe to the /owl_interface/get_pose topic and get the current pose
     # Then republish it
     self._sub_get_pose = rospy.Subscriber('/owl_interface/get_pose', Location,
                                           self._subscribe_get_pose_callback, queue_size = 1)
-
-    # Subscribe to the /state/set_pose topic and republish it to the
-    # owl_interface
-    self._sub_set_pose = rospy.Subscriber('/state/set_pose', Location,
-                                          self._subscribe_set_pose_callback, queue_size = 1)
 
     # Publish battery on a separate thread to /state/battery_level
     thread_pub_battery = threading.Thread(target=self._publish_battery)
@@ -99,18 +86,6 @@ class RobotState:
     log_msg = ('Initialised node: robot_state')
     rospy.loginfo(utils.tag_log(log_msg, LOG_TAG))
 
-  def _subscribe_goal_callback(self, goal):
-    """
-    Subscribes to /owl_interface/goal and gets the next goal. Then, republishes the goal on the /state/map/get_goal topic.
-
-    Args:
-      goal (Location): the current goal
-    """
-    pub_next_goal = rospy.Publisher('/state/map/get_goal', Location, queue_size=1)
-    pub_next_goal.publish(goal)
-    log_msg = (f'Goal received and republished: {goal.name}')
-    rospy.loginfo(utils.tag_log(log_msg, LOG_TAG))
-
   def _subscribe_get_pose_callback(self, pose):
     """
     Subscribes to /state/get_pose and gets the current pose. Then, republishes the pose on the /state/get_pose topic.
@@ -123,20 +98,6 @@ class RobotState:
     pub_get_pose = rospy.Publisher('/state/get_pose', Location, queue_size=1)
     pub_get_pose.publish(current_location)
     log_msg = (f'Current pose received and republished: {current_location.name}')
-    rospy.loginfo(utils.tag_log(log_msg, LOG_TAG))
-
-  def _subscribe_set_pose_callback(self, pose):
-    """
-    Subscribes to /state/set_pose and gets the requested pose. Then, republishes the pose on the /owl_interface/set_pose topic, which will be used by the :mod:`owl_interface` module to change the pose in the ontology.
-
-    Args:
-      pose (Location): the new pose to set
-    """
-    new_location = Location()
-    new_location = pose
-    pub_set_pose = rospy.Publisher('/owl_interface/set_pose', Location, queue_size=1)
-    pub_set_pose.publish(new_location)
-    log_msg = (f'New pose received and republished: {new_location.name}')
     rospy.loginfo(utils.tag_log(log_msg, LOG_TAG))
 
   def _battery_set_mode(self, data):

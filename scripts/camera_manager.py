@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """
 .. module::camera_manager
    :platform: Ubuntu 20.04
@@ -7,289 +9,228 @@
 .. moduleauthor:: Alex Thanaphon Leonardi <thanaphon.leonardi@gmail.com>
 
 This module manages the camera joint and scans for surrounding
-markers.
+markers. The camera can either scan the room for markers, "marker" mode, or scan
+a room normally doing a full rotation, "room" mode.
+
+Publises to:
+  **/Giskard/joint_camera_controller/command**: publishes commands to the camera z-axis rotational joint.\n
+  **/Giskard/joint_camera_vertical_controller/command**: publishes commands to the camera z-axis prismatic joint.
+
+Subscribes to:
+  **/marker_publisher/marker_id**: gets all marker IDs when in "marker" scan mode.
+
+Service:
+  **/camera_manager/start_scan**: given a scan mode, starts scanning.
 """
 
 import rospy
 import threading
-from rospy.exceptions import ROSException
 from exprob_assignment1 import utils
 from exprob_assignment1.msg import *
-from exprob_assignment1.srv import BatteryMode, UpdateVisitedAt
-from std_msgs.msg import Bool, Float64
+from exprob_assignment1.srv import *
+from assignment2.srv import RoomInformation
+from std_msgs.msg import Float64, Int32
 
-LOG_TAG = 'controller'
+LOG_TAG = 'camera_manager'
+lock = threading.Lock()
 
-class ControllerAction():
+class CameraManager():
   """
-  This class represents the controller node, and is comprised of two Action
-  Servers:
-
-  * the /motion/controller/move action server deals with moving the robot through
-    each waypoint up until the final goal.
-  * the /battery/controller/charge action server deals with setting the robot to
-    'charging' mode until the battery reaches 100%, at which point the battery is set back to 'discharging' mode.
+  Class representing the camera manager.
   """
 
   def __init__(self):
     """
-    Initialise the ros_node, define the publishers, subscribers and services, and define the action servers and start them.
+    Initialises the node, sets some helper variables, and starts the service to
+    receive scan requests.
     """
-    rospy.init_node('controller', anonymous=True)
+    rospy.init_node('camera_manager', anonymous=True)
 
-    log_msg = ('Initialised node: controller')
+    log_msg = ('Initialised node: camera_manager')
     rospy.loginfo(utils.tag_log(log_msg, LOG_TAG))
 
-    # Helper variable used to determine if battery is full or not
-    self._is_fully_charged = False
+    # Helper variables
+    self._camera_curr_rot = 0
+    self._detected_marker_ids = set() # sets are fastest for lookup
 
-    # Helper variable used to rotate hokuyo laser
-    self._hokuyo_curr_rot = 0
+    # Service: /camera_manager/start_scan
+    rospy.Service('/camera_manager/start_scan', StartScan, self._service_start_scan)
 
-    # Publisher: /state/set_pose
-    self._pub_set_pose = rospy.Publisher('/state/set_pose', Location, queue_size=10)
-
-    # Publish commands on a separate thread to /Giskard/joint_hokuyo_controller/command
-    thread_pub_hokuyo_command = threading.Thread(target=self._publish_hokuyo_command)
-    thread_pub_hokuyo_command.start()
-
-    # Get current battery level from /state/battery_level
-    # (runs on a separate thread)
-    rospy.Subscriber('/state/battery_level', Battery,
-          self._subscribe_battery_callback, queue_size = 1)
-
-    # Service: /state/battery/set_mode
-    rospy.wait_for_service('/state/battery/set_mode')
-    self._srv_set_battery_mode = rospy.ServiceProxy('/state/battery/set_mode', BatteryMode)
-
-    # Service: /owl_interface/update_visited
-    rospy.wait_for_service('/owl_interface/update_visited')
-    self._srv_update_visited = rospy.ServiceProxy('/owl_interface/update_visited', UpdateVisitedAt)
-
-    # Define the MOVEMENT action server and start it
-    self._as_move = actionlib.SimpleActionServer('/motion/controller/move',
-                                            ControlAction,
-                                            execute_cb = self._execute_move_cb,
-                                            auto_start = False)
-    self._as_move.start()
-
-    # Define the CHARGING action server and start it
-    self._as_charge = actionlib.SimpleActionServer('/battery/controller/charge',
-                                            ChargeAction,
-                                            execute_cb = self._execute_charge_cb,
-                                            auto_start = False)
-    self._as_charge.start()
-
-  def _publish_hokuyo_command(self):
+  def _service_start_scan(self, type):
     """
-    Publishes commands to the /Giskard/joint_hokuyo_controller/command to rotate
-    the laser scanner by 360 degrees multiple times every second
+    Starts the scan, based on requested type (either "marker" or "room")
+    """
+    scan_type = type.type
+    self._camera_curr_rot = 0
+
+    # Build the ontology once the marker scanning is complete
+    thread_build_ontology = threading.Thread(target=self._build_ontology)
+
+    # Get all marker IDs and store them in an array by subscribing to
+    # /marker_publisher/marker_id
+    self._sub_marker_id = rospy.Subscriber('/marker_publisher/marker_id', Int32,
+                                          self._subscribe_marker_id_callback,
+                                          queue_size = 100)
+
+    if (scan_type == "marker"):
+      # Four full rotations: clockwise up, counter-clockwise up, clockwise down,
+      # counter-clockwise down
+      self._publish_marker_scan(thread_build_ontology)
+
+    elif (scan_type == "room"):
+      # One single full rotation
+      self._publish_room_scan(thread_build_ontology)
+
+    return True
+
+  def _publish_marker_scan(self, thread_build_ontology):
+    """
+    Publishes commands to the /Giskard/joint_camera_controller/command topic and
+    also to the /Giskard/joint_camera_vertical_controller/command topic
     """
     # Publisher
-    pub_hokuyo_command = rospy.Publisher('/Giskard/joint_hokuyo_controller/command',
+    pub_camera_command = rospy.Publisher('/Giskard/joint_camera_controller/command',
                                       Float64, queue_size = 60, latch = True)
-    rate = rospy.Rate(4)
+    pub_camera_vertical_command = rospy.Publisher('/Giskard/joint_camera_vertical_controller/command',
+                                      Float64, queue_size = 60, latch = True)
+    rate = rospy.Rate(2)
+
+    # Total number of full rotations
+    num_rot = 0;
+
+    # Raise camera up
+    command_prismatic = 1.5
+    pub_camera_vertical_command.publish(command_prismatic)
 
     while not rospy.is_shutdown():
       command = Float64()
+      command_prismatic = Float64()
+      rot_step = 0.19625*4
 
-      # Rotate the hokuyo 360 degrees
-      self._hokuyo_curr_rot = (self._hokuyo_curr_rot + 1.57) % 6.28
+      # Rotate the camera 360 degrees
+      if (num_rot % 2 == 0):
+        self._camera_curr_rot = self._camera_curr_rot - rot_step
+      else:
+        self._camera_curr_rot = self._camera_curr_rot + rot_step
 
-      command.data = self._hokuyo_curr_rot
-      pub_hokuyo_command.publish(command)
+      if abs(self._camera_curr_rot) > (6.28 + rot_step):
+        # Full rotation completed (plus a margin for extra rotation)
+        num_rot += 1;
+        self._camera_curr_rot = 0.0
+        command.data = self._camera_curr_rot
+        pub_camera_command.publish(command)
+
+        # If first rotation complete, lower the camera
+        if (num_rot == 1):
+          command_prismatic = 0.5
+          pub_camera_vertical_command.publish(command_prismatic)
+        elif (num_rot == 2):
+          # Second rotation is final so reset and stop the joints
+          command_prismatic = 0
+          pub_camera_vertical_command.publish(command_prismatic)
+          # Start the ontology building after a short wait to sync
+          rospy.sleep(3)
+          thread_build_ontology.start()
+          rospy.loginfo(utils.tag_log(f"Marker scanning complete."
+                                       "Ontology building initiated.", LOG_TAG))
+          return
+      else:
+        command.data = self._camera_curr_rot
+        pub_camera_command.publish(command)
+
       rate.sleep()
 
-
-  def _execute_move_cb(self, plan):
+  def _publish_room_scan(self, thread_build_ontology):
     """
-    Callback function for the /motion/controller/move action server.\n
-    The given plan is comprised of waypoints/viapoints which will be traversed
-    one-by-one, until the final one is reached.
+    Publishes commands to the /Giskard/joint_camera_controller/command topic and
+    also to the /Giskard/joint_camera_vertical_controller/command topic.
+    """
+    # Publisher
+    pub_camera_command = rospy.Publisher('/Giskard/joint_camera_controller/command',
+                                      Float64, queue_size = 60, latch = True)
+    pub_camera_vertical_command = rospy.Publisher('/Giskard/joint_camera_vertical_controller/command',
+                                      Float64, queue_size = 60, latch = True)
+    rate = rospy.Rate(2)
+
+    # Raise camera up
+    command_prismatic = 0.5
+    pub_camera_vertical_command.publish(command_prismatic)
+
+    while not rospy.is_shutdown():
+      command = Float64()
+      rot_step = 0.19625*2
+
+      # Rotate the camera 360 degrees
+      self._camera_curr_rot = self._camera_curr_rot + rot_step
+
+      if abs(self._camera_curr_rot) > (6.28 + rot_step):
+        # Full rotation completed (plus a margin for extra rotation)
+        self._camera_curr_rot = 0.0
+        command.data = self._camera_curr_rot
+        pub_camera_command.publish(command)
+        rospy.loginfo(utils.tag_log(f"Room scanning complete.", LOG_TAG))
+
+        # Lower camera
+        command_prismatic = 0.0
+        pub_camera_vertical_command.publish(command_prismatic)
+
+        return
+      else:
+        command.data = self._camera_curr_rot
+        pub_camera_command.publish(command)
+
+      rate.sleep()
+
+  def _subscribe_marker_id_callback(self, data):
+    """
+    Subscribes to /marker_publisher/marker_id and gets the detected marker IDs,
+    which are added to an array which will contain all detected IDs.
 
     Args:
-      plan (ControlAction): a set of Location variables (viapoints).
-
-    Feedback:
-      ControlFeedback: the viapoints reached so far.
-
-    Result:
-      ControlResult:\n
-      True -- success, reached final destination.\n
-      False -- failure, final destination not reached.
-
-    Raises:
-      ROSException
+      data (Int32): the marker ID
     """
-    # Define messages that are used to publish feedback/result
-    feedback = ControlFeedback()
-    result = ControlResult()
-    feedback.via_points_reached = []
+    marker_id = Int32()
+    marker_id = data.data
 
-    # Execute action and send feedback
-    # Note: the controller is supposed to physically move the robot. Setting
-    # the pose is considered a mere software operation of updating the map to
-    # reflect the current reality. Setting the pose does not actually change
-    # the robot's pose; the physical movement happens here, by the controller.
-    # In reality, this should take a while, but in this simulation the controller
-    # does not actually do any computation, so computation is simulated
-    for current_goal in plan.via_points:
-      # Simulate robot movement
-      rospy.loginfo(utils.tag_log(f'Moving robot to {current_goal.name}', LOG_TAG))
-      self._simulate_computation()
-      # Update the map (ontology) by publishing to the /state/set_pose topic
-      self._pub_set_pose.publish(current_goal)
-      # Send feedback
-      feedback.via_points_reached.append(current_goal)
-      self._as_move.publish_feedback(feedback)
+    # Python set will automatically avoid duplicates
+    with lock:
+      self._detected_marker_ids.add(marker_id)
 
-    # Check if the final goal has been reached
-    current_location = Location()
-    current_location.name = 'unknown'
-    try:
-      rospy.sleep(1) # Wait for pose to update
-      current_location = rospy.wait_for_message('/state/get_pose', Location, timeout=15)
-    except ROSException:
-      rospy.loginfo(utils.tag_log('Failed to get the current pose', LOG_TAG))
-
-    if (current_location == feedback.via_points_reached[-1]):
-      # Goal reached
-      result.success.data = True
-      # Update location timestamp
-      self._update_location_visited(current_location.name)
-      log_msg = (f'Controller successfully reached final goal.' +
-                 f' Current position: {current_location.name}')
-      self._as_move.set_succeeded(result)
-
-    else:
-      # Failure
-      result.success.data = False
-      log_msg = (f'Controller failed to reach final goal.' +
-                 f' Current position: {current_location}')
-      self._as_move.set_aborted(result)
-
-    rospy.loginfo(utils.tag_log(log_msg, LOG_TAG))
-
-  def _execute_charge_cb(self, empty):
+  def _build_ontology(self):
     """
-    Callback function for the /battery/controller/charge action server.\n
-    The robot will be set to 'charging' mode until the battery reaches 100%, at
-    which point it will be set back to 'discharging' mode.
-
-    Args:
-      empty (ChargeAction): This is ignored.
-
-    Feedback:
-      ChargeFeedback: This should be ignored.
-
-    Result:
-      ChargeResult:\n
-      True -- success, fully charged.\n
-      False -- failure, could not change charging mode.
-
-    Raises:
-      rospy.ServiceException - indicates failure to call service.
+    Sends the detected marker IDs to the marker server, gets the corresponding
+    information and builds the ontology by interfacing with the owl_interface
     """
-    # Define messages that are used to publish feedback/result
-    feedback = ChargeFeedback()
-    result = ChargeResult()
+    rospy.wait_for_service('/room_info')
+    service_get_room_info = rospy.ServiceProxy('/room_info', RoomInformation)
+    rospy.wait_for_service('/owl_interface/add_room')
+    service_add_room = rospy.ServiceProxy('/owl_interface/add_room', AddRoom)
 
-    # Execute action and send feedback
-    # Charge robot battery
-    rospy.loginfo(utils.tag_log(f'Charging the battery...', LOG_TAG))
-    self._battery_charge_start()
+    with lock:
+      detected_marker_ids = self._detected_marker_ids
 
-    # Send feedback (EMPTY)
-    self._as_charge.publish_feedback(feedback)
+    rospy.loginfo(utils.tag_log(f'detected marker ids: {detected_marker_ids}', LOG_TAG))
+    rospy.loginfo(utils.tag_log("Sending room information to owl_interface", LOG_TAG))
 
-    # Wait until fully charged
-    while (self._is_fully_charged == False):
-      rospy.sleep(1)
+    for id in detected_marker_ids:
+      room_info = AddRoomRequest()
 
-    self._battery_charge_stop()
+      ret = service_get_room_info(id)
 
-    self._as_charge.set_succeeded(result)
+      # If response is invalid, skip this ID
+      if ret.room == "no room associated with this marker id":
+        rospy.loginfo(utils.tag_log(f'Invalid ID detected ({id}), skipping', LOG_TAG))
+        continue
 
-    rospy.loginfo(utils.tag_log('Charging has stopped', LOG_TAG))
+      room_info.room = ret.room
+      room_info.x = ret.x
+      room_info.y = ret.y
+      room_info.connections = ret.connections
 
-  def _simulate_computation(self):
-    """
-    2 second busy waiting to simulate computation, used by :func:`_execute_move_cbs`
-    """
-    rospy.sleep(2)
+      service_add_room(room_info)
 
-  def _battery_charge_start(self):
-    """
-    Set the robot to charging mode by calling the /state/battery/set_mode service.
-
-    Raises:
-      rospy.ServiceException indicates failure to call service.
-
-    Note:
-      This function should only be used by :func:`_execute_charge_cb`.
-    """
-    try:
-      mode = BatteryMode()
-      mode = 'charging'
-      return self._srv_set_battery_mode(mode)
-    except rospy.ServiceException as e:
-      rospy.loginfo(utils.tag_log(f'Battery charge failed: {e}', LOG_TAG))
-      self._as_charge.set_aborted(ChargeResult())
-
-  def _battery_charge_stop(self):
-    """
-    Set the robot to discharging mode by calling the /state/battery/set_mode service.
-
-    Raises:
-      rospy.ServiceException indicates failure to call service.
-
-    Note:
-      This function should only be used by :func:`_execute_charge_cb`.
-    """
-    try:
-      mode = BatteryMode()
-      mode = 'discharging'
-      return self._srv_set_battery_mode(mode)
-    except rospy.ServiceException as e:
-      rospy.loginfo(utils.tag_log(f'Failed to abort charging mode: {e}', LOG_TAG))
-      self._as_charge.set_aborted(ChargeResult())
-
-  def _update_location_visited(self, curr_loc):
-    """
-    Updates the visitedAt data property of a location in the ontology.
-
-    Raises:
-      rospy.ServiceException indicates failure to call service.
-
-    Note:
-      This function should only be used by :func:`_execute_move_cb`.
-    """
-    try:
-      loc_to_update = UpdateVisitedAt()
-      loc_to_update.name = curr_loc
-      return self._srv_update_visited(loc_to_update)
-    except rospy.ServiceException as e:
-      rospy.loginfo(utils.tag_log(f'Location time visited update failed: {e}', LOG_TAG))
-
-  def _subscribe_battery_callback(self, data):
-    """
-    Subscriber callback to the /state/battery_level topic which gets the current
-    battery level.
-
-    This callback remains active the entire time, and never shuts down.
-
-    Args:
-      data (Battery): the current battery level.
-    """
-    battery_msg = Battery()
-    battery_msg = data
-    battery_level = battery_msg.battery_level
-
-    if (battery_level < 100):
-      self._is_fully_charged = False
-    else:
-      self._is_fully_charged = True
+      rospy.loginfo(utils.tag_log(f"Request sent for {room_info.room}", LOG_TAG))
 
 if __name__ == "__main__":
-    ControllerAction()
+    CameraManager()
     rospy.spin()
