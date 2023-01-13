@@ -32,6 +32,10 @@ which has been forked and expanded for this assignment.
 ```
 git clone https://www.github.com/ThanaphonLeonardi/assignment2
 ```
+Another dependency is the modified aruco_ros package
+```
+git clone https://www.github.com/ThanaphonLeonardi/aruco_ros
+```
 It also requires [ARMOR](https://github.com/EmaroLab/armor) (follow the
 [tutorial presented here](https://github.com/EmaroLab/armor/issues/7)) and the
 [ArmorPy API](https://github.com/EmaroLab/armor_py_api):
